@@ -195,18 +195,26 @@ func startWebServer(port int) {
 	// Runner management
 	mux.HandleFunc("/api/v1/runners/add", authReq(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Name   string `json:"name"`
-			URL    string `json:"url"`
-			Token  string `json:"token"`
-			Labels string `json:"labels"`
+			Name     string `json:"name"`
+			URL      string `json:"url"`
+			Token    string `json:"token"`
+			Labels   string `json:"labels"`
+			Capacity int    `json:"capacity"`
+			Platform string `json:"platform"`
 		}
 		if err := jsonDec(r, &req); err != nil {
 			jsonErr(w, "invalid json", 400)
 			return
 		}
+		if req.Capacity == 0 {
+			req.Capacity = 1
+		}
+		if req.Platform == "" {
+			req.Platform = "forgejo"
+		}
 		addRunner(req.Name, req.Token, req.URL)
 		dockerCompose("up", "-d", req.Name)
-		jsonResp(w, map[string]string{"status": "created", "name": req.Name})
+		jsonResp(w, map[string]string{"status": "created", "name": req.Name, "platform": req.Platform})
 	}))
 
 	mux.HandleFunc("/api/v1/runners/", authReq(func(w http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,18 @@
 services:
+  web:
+    build: .
+    container_name: deploy-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/www:/var/www
+      - deploy-data:/data
+    environment:
+      - DEPLOY_ADMIN_USER=${DEPLOY_ADMIN_USER:-admin}
+      - DEPLOY_ADMIN_PASS=${DEPLOY_ADMIN_PASS:-admin}
+
   runner:
     image: data.forgejo.org/forgejo/runner:4.0.0
     container_name: runner
@@ -11,3 +25,6 @@ services:
       sh -c "sleep 10 &&
              apk update && apk add --no-cache nodejs npm &&
              forgejo-runner daemon --config /data/config.yaml"
+
+volumes:
+  deploy-data:

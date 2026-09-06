@@ -25,14 +25,20 @@ curl -L https://git.example.com/example/deploy-stack/raw/branch/main/dist/deploy
 chmod +x /usr/local/bin/deploy
 ```
 
-### First deploy
+### Start web UI
 
 ```bash
-# Interactive mode
-deploy
+deploy serve --port 3000
+# Open http://localhost:3000
+# Login: admin / admin (change via DEPLOY_ADMIN_USER/DEPLOY_ADMIN_PASS)
+```
 
-# Or CLI
+### CLI mode
+
+```bash
 deploy add mysite /var/www/mysite --port 8080
+deploy list
+deploy status
 ```
 
 ### Add to your repo
@@ -73,9 +79,17 @@ jobs:
 | `deploy status` | Show container status |
 | `deploy up` | Start all services |
 | `deploy down` | Stop all services |
+| `deploy serve --port 3000` | Start web UI + API |
 | `deploy add-runner <name> <token>` | Add Forgejo runner |
 | `deploy rm-runner [name]` | Remove runner(s) |
 | `deploy runners` | List all runners |
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEPLOY_ADMIN_USER` | `admin` | Web UI login |
+| `DEPLOY_ADMIN_PASS` | `admin` | Web UI password |
 
 ## Supported Languages
 

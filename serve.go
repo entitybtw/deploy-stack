@@ -368,40 +368,19 @@ func listSites() []map[string]interface{} {
 		seen[name] = true
 	}
 
-	// Also find running containers that were deployed via deploy-stack
-	// (have /var/www in their mounts)
-	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}|{{.Mounts}}")
+	// Find running containers
+	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}|{{.Status}}")
 	if out, err := cmd.Output(); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-			parts := strings.SplitN(line, "|", 4)
-			if len(parts) < 3 {
-				continue
-			}
+			parts := strings.SplitN(line, "|", 2)
+			if len(parts) < 2 { continue }
 			name := parts[0]
-			if name == "runner" || strings.HasPrefix(name, "runner-") || strings.Contains(name, "docker_dind") || strings.Contains(name, "forgejo") {
-				continue
-			}
-			if seen[name] {
-				continue
-			}
-		// Only include containers with /var/www mount (deploy-stack managed)
-		mounts := ""
-		if len(parts) > 3 {
-			mounts = parts[3]
-		}
-		if !strings.Contains(mounts, "/var/www") {
-			continue
-		}
-		// Filter out volumes like deploy-data, web, etc.
-		if name == "deploy-data" || name == "web" || name == "deploy-web" {
-			continue
-		}
-			port := 0
-			if pm := regexp.MustCompile(`127\.0\.0\.1:(\d+):`).FindStringSubmatch(parts[2]); len(pm) > 1 {
-				port, _ = strconv.Atoi(pm[1])
-			}
+			if name == "runner" || strings.HasPrefix(name, "runner-") || 
+			   strings.Contains(name, "docker_dind") || strings.Contains(name, "forgejo") ||
+			   name == "deploy-web" || name == "deploy-data" { continue }
+			if seen[name] { continue }
 			sites = append(sites, map[string]interface{}{
-				"name": name, "port": port, "status": "running",
+				"name": name, "port": 0, "status": "running",
 				"type": "docker", "dir": "/var/www/" + name,
 			})
 		}

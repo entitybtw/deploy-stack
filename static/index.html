@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>deploy-stack</title>
+<style>
+:root{--accent:#7a9db8;--accent-glow:#1a2530;--green:#7a9;--red:#d77;--max-w:900px}
+[data-theme="dark"]{--bg-0:#0f0f0f;--bg-1:#1a1a1a;--bg-2:#222;--bg-3:#2a2a2a;--text-0:#ddd;--text-1:#999;--text-2:#666;--border-1:#2a2a2a;--border-2:#333}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:var(--bg-0);color:var(--text-0);line-height:1.5}
+.wrap{max-width:var(--max-w);margin:0 auto;padding:16px}
+.nav{padding:12px 0;border-bottom:1px solid var(--border-1);margin-bottom:16px}
+.nav-inner{max-width:var(--max-w);margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:12px}
+.logo{font-size:1rem;font-weight:700;color:var(--accent)}.logo span{color:var(--text-2);font-weight:400}
+.stats{margin-left:auto;display:flex;gap:16px;font-size:.8rem;color:var(--text-2)}.stats b{color:var(--text-0)}
+.card{background:var(--bg-1);border:1px solid var(--border-1);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:border-color .15s}.card:hover{border-color:var(--border-2)}
+.card-name{font-weight:600;font-size:.9rem;min-width:140px}
+.card-type{font-family:monospace;font-size:.75rem;padding:2px 8px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(122,157,184,.2);border-radius:2px}
+.card-port{font-family:monospace;font-size:.8rem;color:var(--text-1);min-width:60px}
+.card-status{font-size:.75rem;padding:2px 8px;border-radius:2px;min-width:60px;text-align:center}
+.s-running{background:rgba(119,153,64,.08);color:var(--green);border:1px solid rgba(119,153,64,.2)}
+.s-stopped{background:rgba(221,119,119,.08);color:var(--red);border:1px solid rgba(221,119,119,.2)}
+.card-actions{margin-left:auto;display:flex;gap:6px}
+.btn{padding:5px 12px;font-size:.78rem;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px}.btn:hover{border-color:var(--accent);color:var(--text-0)}
+.btn-danger:hover{border-color:var(--red);color:var(--red)}.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-primary:hover{opacity:.9}
+.empty{text-align:center;padding:40px;color:var(--text-2)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}.modal-overlay.active{display:flex}
+.modal{background:var(--bg-1);border:1px solid var(--border-2);padding:20px;width:420px;max-width:90vw;border-radius:6px}
+.modal h2{font-size:1rem;margin-bottom:12px;font-weight:600}
+.form-row{margin-bottom:10px}.form-row label{display:block;font-size:.78rem;color:var(--text-2);margin-bottom:4px}
+.form-row input{width:100%;padding:7px 10px;background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-0);font-size:.85rem;border-radius:3px}
+.form-row input:focus{outline:none;border-color:var(--accent)}
+.form-actions{display:flex;gap:8px;margin-top:14px}
+#addBtn{position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;font-size:1.5rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.3);z-index:50;border:none;cursor:pointer}#addBtn:hover{opacity:.9}
+.logs-box{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}.logs-box.active{display:flex}
+.logs-inner{background:var(--bg-1);border:1px solid var(--border-2);padding:16px;width:650px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;border-radius:6px}
+.logs-inner pre{flex:1;overflow:auto;font-family:monospace;font-size:.75rem;color:var(--text-1);white-space:pre-wrap;word-break:break-all}
+#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-box{background:var(--bg-1);border:1px solid var(--border-2);padding:24px;width:340px;border-radius:6px}
+.login-box h1{text-align:center;margin-bottom:16px;font-size:1.1rem}
+.login-box .logo{text-align:center;font-size:1.2rem;font-weight:700;color:var(--accent);margin-bottom:16px}
+.login-box .logo span{color:var(--text-2)}
+</style>
+</head>
+<body>
+<div id="loginPage">
+  <div class="login-box">
+    <div class="logo">deploy<span>-stack</span></div>
+    <h1>Sign In</h1>
+    <div class="form-row"><label>Username</label><input id="loginUser" placeholder="admin"></div>
+    <div class="form-row"><label>Password</label><input id="loginPass" type="password" placeholder="password"></div>
+    <div class="form-actions" style="justify-content:center"><button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In</button></div>
+  </div>
+</div>
+<div id="mainPage" style="display:none">
+  <nav class="nav"><div class="nav-inner">
+    <div class="logo">deploy<span>-stack</span></div>
+    <div class="stats"><span>Sites: <b id="siteCount">0</b></span><span>Runners: <b id="runnerCount">0</b></span></div>
+    <a href="/api/v1/docs" target="_blank" style="color:var(--text-1);font-size:.8rem;text-decoration:none">API Docs</a>
+  </div></nav>
+  <div class="wrap">
+    <div id="sites"></div>
+    <div id="empty" class="empty" style="display:none">No sites deployed. Click + to add one.</div>
+  </div>
+  <button id="addBtn" onclick="showModal()">+</button>
+</div>
+<div class="modal-overlay" id="modal"><div class="modal">
+  <h2>Deploy Site</h2>
+  <div class="form-row"><label>Name</label><input id="fName" placeholder="mysite"></div>
+  <div class="form-row"><label>Directory</label><input id="fDir" placeholder="/var/www/mysite"></div>
+  <div class="form-row"><label>Port</label><input id="fPort" type="number" placeholder="auto"></div>
+  <div class="form-row"><label>Type</label><input id="fType" placeholder="auto-detect"></div>
+  <div class="form-actions"><button class="btn" onclick="hideModal()">Cancel</button><button class="btn btn-primary" onclick="addSite()">Deploy</button></div>
+</div></div>
+<div class="logs-box" id="logsBox"><div class="logs-inner">
+  <button class="btn" onclick="closeLogs()" style="align-self:flex-end;margin-bottom:8px">Close</button>
+  <pre id="logsContent"></pre>
+</div></div>
+<script>
+var T=localStorage.getItem("dt")||"";
+function api(m,p,b){var o={method:m,headers:{"Content-Type":"application/json"}};if(T)o.headers.Authorization="Bearer "+T;if(b)o.body=JSON.stringify(b);return fetch(p,o).then(function(r){if(r.status===401){showLogin();throw"unauth"}return r.json()})}
+function doLogin(){fetch("/api/v1/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("loginUser").value,password:document.getElementById("loginPass").value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem("dt",T);showMain()}else alert(d.error||"Failed")}).catch(function(){alert("Error")})}
+function showLogin(){document.getElementById("loginPage").style.display="flex";document.getElementById("mainPage").style.display="none"}
+function showMain(){document.getElementById("loginPage").style.display="none";document.getElementById("mainPage").style.display="block";loadSites()}
+function loadSites(){api("GET","/api/v1/sites").then(function(s){document.getElementById("siteCount").textContent=s.length;document.getElementById("empty").style.display=s.length?"none":"block";document.getElementById("sites").innerHTML=s.map(function(x){return '<div class="card"><div class="card-name">'+x.name+'</div><div class="card-type">'+(x.type||"?")+'</div><div class="card-port">:'+x.port+'</div><div class="card-status s-'+x.status+'">'+x.status+'</div><div class="card-actions"><button class="btn" onclick="logs(\''+x.name+'\')">Logs</button><button class="btn" onclick="restart(\''+x.name+'\')">Restart</button><button class="btn btn-danger" onclick="remove(\''+x.name+'\')">Remove</button></div></div>'}).join("")}).catch(function(){})}
+function showModal(){document.getElementById("modal").classList.add("active")}
+function hideModal(){document.getElementById("modal").classList.remove("active")}
+function addSite(){var n=document.getElementById("fName").value;if(!n)return alert("Name required");api("POST","/api/v1/sites",{name:n,dir:document.getElementById("fDir").value||"/var/www/"+n,port:parseInt(document.getElementById("fPort").value)||0,type:document.getElementById("fType").value}).then(function(){hideModal();setTimeout(loadSites,2000)})}
+function remove(n){if(confirm("Remove "+n+"?"))api("DELETE","/api/v1/sites/"+n+"/remove").then(function(){setTimeout(loadSites,1000)})}
+function restart(n){api("POST","/api/v1/sites/"+n+"/restart").then(function(){setTimeout(loadSites,2000)})}
+function logs(n){fetch("/api/v1/sites/"+n+"/logs",{headers:T?{Authorization:"Bearer "+T}:{}}).then(function(r){return r.text()}).then(function(t){document.getElementById("logsContent").textContent=t;document.getElementById("logsBox").classList.add("active")})}
+function closeLogs(){document.getElementById("logsBox").classList.remove("active")}
+if(T)api("GET","/api/v1/status").then(function(){showMain()}).catch(function(){showLogin()});else showLogin();
+</script>
+</body>
+</html>

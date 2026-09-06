@@ -40,9 +40,9 @@
 .log-box{background:var(--bg-1);border:1px solid var(--border-2);padding:14px;width:620px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;border-radius:6px}
 .log-box pre{flex:1;overflow:auto;font-family:var(--font-mono);font-size:.73rem;color:var(--text-1);white-space:pre-wrap;word-break:break-all}
 #loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh}
-.login-box{background:var(--bg-1);border:1px solid var(--border-2);padding:22px;width:320px;border-radius:6px;text-align:center}
-.login-box h1{margin-bottom:14px;font-size:1.05rem}
-.login-box .logo{font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.login-box .logo span{color:var(--text-2)}
+.login-box{background:var(--bg-1);border:1px solid var(--border-2);padding:24px 28px;width:320px;border-radius:6px}
+.login-box h1{text-align:center;margin-bottom:14px;font-size:1.05rem}
+.login-box .logo{text-align:center;font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.login-box .logo span{color:var(--text-2)}
 .thm{padding:4px 8px;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px;font-size:.72rem}.thm:hover{border-color:var(--accent);color:var(--text-0)}
 </style>
 </head>
@@ -51,10 +51,10 @@
   <div class="login-box">
     <div class="logo">deploy<span>-stack</span></div>
     <h1>Sign In</h1>
-    <div class="fg"><label>Username</label><input id="iUser" placeholder="admin"></div>
-    <div class="fg"><label>Password</label><input id="iPass" type="password" placeholder="password"></div>
-    <div class="fa" style="justify-content:center"><button class="btn btn-p" style="width:100%" onclick="login()">Sign In</button></div>
-    <div style="margin-top:10px"><button class="thm" onclick="cycleTheme()">theme</button></div>
+    <div class="fg"><label>Username</label><input id="iUser" placeholder="admin" autocomplete="username"></div>
+    <div class="fg"><label>Password</label><input id="iPass" type="password" placeholder="password" autocomplete="current-password"></div>
+    <div style="margin-top:16px"><button class="btn btn-p" style="width:100%;padding:9px;font-size:.88rem" onclick="login()">Sign In</button></div>
+    <div style="text-align:center;margin-top:12px"><button class="thm" onclick="cycleTheme()">theme</button></div>
   </div>
 </div>
 <div id="mainPage" style="display:none">

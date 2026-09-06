@@ -96,9 +96,23 @@ jobs:
 
       - name: Deploy
         run: |
-          rsync -a --delete --exclude='.git' ./ /var/www/mysite/
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='*.db' --exclude='*.sqlite' --exclude='*.sqlite3' \
+            --exclude='*.db-wal' --exclude='*.db-shm' \
+            ./ /var/www/mysite/
           deploy add mysite /var/www/mysite
 ```
+
+**Что делает:**
+- `rsync --exclude='*.db'` — копирует код, но **не трогает** БД (она остаётся на сервере)
+- `deploy add` — определяет язык, собирает Docker-образ, запускает контейнер
+- Авто-миграция: если в проекте есть `install/migrate.sh` или `artisan migrate` — выполняется автоматически
+
+**БД и миграции:**
+- При первом деплое: миграция создаёт таблицы
+- При последующих: миграция добавляет новые таблицы/колонки, данные **не теряются**
+- БД файлы исключены из rsync → они живут на сервере навсегда
 
 Или просто:
 

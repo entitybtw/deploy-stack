@@ -384,14 +384,18 @@ func listSites() []map[string]interface{} {
 			if seen[name] {
 				continue
 			}
-			// Only include containers with /var/www mount (deploy-stack managed)
-			mounts := ""
-			if len(parts) > 3 {
-				mounts = parts[3]
-			}
-			if !strings.Contains(mounts, "/var/www") {
-				continue
-			}
+		// Only include containers with /var/www mount (deploy-stack managed)
+		mounts := ""
+		if len(parts) > 3 {
+			mounts = parts[3]
+		}
+		if !strings.Contains(mounts, "/var/www") {
+			continue
+		}
+		// Filter out volumes like deploy-data, web, etc.
+		if name == "deploy-data" || name == "web" || name == "deploy-web" {
+			continue
+		}
 			port := 0
 			if pm := regexp.MustCompile(`127\.0\.0\.1:(\d+):`).FindStringSubmatch(parts[2]); len(pm) > 1 {
 				port, _ = strconv.Atoi(pm[1])

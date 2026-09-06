@@ -5,163 +5,163 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>deploy-stack</title>
 <style>
-:root{--accent:#7a9db8;--accent-glow:#1a2530;--green:#7a9;--red:#d77;--yellow:#dd7;--max-w:960px}
-[data-theme="dark"]{--bg-0:#0f0f0f;--bg-1:#1a1a1a;--bg-2:#222;--bg-3:#2a2a2a;--text-0:#ddd;--text-1:#999;--text-2:#666;--border-1:#2a2a2a;--border-2:#333}
-[data-theme="light"]{--bg-0:#fafafa;--bg-1:#fff;--bg-2:#f5f5f5;--bg-3:#eee;--text-0:#222;--text-1:#666;--text-2:#999;--border-1:#ddd;--border-2:#ccc}
-[data-theme="black"]{--bg-0:#000;--bg-1:#111;--bg-2:#1a1a1a;--bg-3:#222;--text-0:#eee;--text-1:#aaa;--text-2:#666;--border-1:#222;--border-2:#2a2a2a}
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg-0);color:var(--text-0);line-height:1.5}
-.wrap{max-width:var(--max-w);margin:0 auto;padding:0 16px}
-.nav{padding:10px 0;border-bottom:1px solid var(--border-1)}
-.nav-inner{max-width:var(--max-w);margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.logo{font-size:1rem;font-weight:700;color:var(--accent)}.logo span{color:var(--text-2);font-weight:400}
-.nav-tabs{display:flex;gap:0;margin:0 auto}
-.nav-tab{padding:6px 14px;font-size:.82rem;color:var(--text-1);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;white-space:nowrap}.nav-tab:hover{color:var(--text-0)}.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.stats{display:flex;gap:12px;font-size:.75rem;color:var(--text-2);flex-wrap:wrap}.stats b{color:var(--text-0)}
-.section-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-.section-title{font-size:.85rem;color:var(--text-2);font-weight:500}
-.card{background:var(--bg-1);border:1px solid var(--border-1);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;transition:border-color .15s;border-radius:4px;flex-wrap:wrap}.card:hover{border-color:var(--border-2)}
-.card-name{font-weight:600;font-size:.85rem;min-width:100px}
-.card-meta{font-family:ui-monospace,Courier New,monospace;font-size:.72rem;padding:2px 7px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(122,157,184,.2);border-radius:2px;white-space:nowrap}
-.card-val{font-family:ui-monospace,Courier New,monospace;font-size:.75rem;color:var(--text-1);min-width:40px}
-.badge{font-size:.7rem;padding:2px 7px;border-radius:3px;min-width:50px;text-align:center;font-weight:500;white-space:nowrap}
-.badge-on{background:rgba(119,153,64,.1);color:var(--green);border:1px solid rgba(119,153,64,.25)}
-.badge-off{background:rgba(221,119,119,.1);color:var(--red);border:1px solid rgba(221,119,119,.25)}
-.card-actions{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
-.btn{padding:3px 8px;font-size:.72rem;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px;transition:all .12s;white-space:nowrap}.btn:hover{border-color:var(--accent);color:var(--text-0)}
-.btn-d:hover{border-color:var(--red);color:var(--red)}.btn-s:hover{border-color:var(--yellow);color:var(--yellow)}
-.btn-p{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-p:hover{opacity:.9}
-.btn-g{background:rgba(119,153,64,.15);color:var(--green);border:1px solid rgba(119,153,64,.3)}
-.empty{text-align:center;padding:30px;color:var(--text-2);font-size:.85rem}
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px;cursor:pointer}.modal-bg.on{display:flex}
-.modal{background:var(--bg-1);border:1px solid var(--border-2);padding:20px;width:420px;max-width:100%;border-radius:6px;cursor:default}
-.modal h2{font-size:.95rem;margin-bottom:12px;font-weight:600}
-.fg{margin-bottom:10px}.fg label{display:block;font-size:.75rem;color:var(--text-2);margin-bottom:3px}
-.fg input,.fg select{width:100%;padding:6px 9px;background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-0);font-size:.82rem;border-radius:3px}.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+:root{--accent:#7a9db8;--ag:#1a2530;--grn:#7a9;--red:#d77;--yel:#dd7;--mw:960px}
+[data-theme="dark"]{--b0:#0f0f0f;--b1:#1a1a1a;--b2:#222;--b3:#2a2a2a;--t0:#ddd;--t1:#999;--t2:#666;--br1:#2a2a2a;--br2:#333}
+[data-theme="light"]{--b0:#fafafa;--b1:#fff;--b2:#f5f5f5;--b3:#eee;--t0:#222;--t1:#666;--t2:#999;--br1:#ddd;--br2:#ccc}
+[data-theme="black"]{--b0:#000;--b1:#111;--b2:#1a1a1a;--b3:#222;--t0:#eee;--t1:#aaa;--t2:#666;--br1:#222;--br2:#2a2a2a}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:var(--b0);color:var(--t0);line-height:1.5}
+.w{max-width:var(--mw);margin:0 auto;padding:0 16px}
+.nav{padding:10px 0;border-bottom:1px solid var(--br1)}
+.ni{max-width:var(--mw);margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:1rem;font-weight:700;color:var(--accent)}.logo span{color:var(--t2)}
+.nt{display:flex;margin:0 auto}.ntb{padding:6px 14px;font-size:.82rem;color:var(--t1);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;white-space:nowrap}.ntb:hover{color:var(--t0)}.ntb.a{color:var(--accent);border-bottom-color:var(--accent)}
+.st{display:flex;gap:12px;font-size:.75rem;color:var(--t2);flex-wrap:wrap}.st b{color:var(--t0)}
+.sh{display:flex;align-items:center;gap:10px;margin:16px 0 12px;flex-wrap:wrap}
+.sh-t{font-size:.85rem;color:var(--t2);font-weight:500}
+.c{background:var(--b1);border:1px solid var(--br1);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;border-radius:4px;flex-wrap:wrap;transition:border-color .15s}.c:hover{border-color:var(--br2)}
+.cn{font-weight:600;font-size:.85rem;min-width:100px}
+.cm{font-family:ui-monospace,monospace;font-size:.72rem;padding:2px 7px;background:var(--ag);color:var(--accent);border:1px solid rgba(122,157,184,.2);border-radius:2px;white-space:nowrap}
+.cv{font-family:ui-monospace,monospace;font-size:.75rem;color:var(--t1)}
+.b{font-size:.7rem;padding:2px 7px;border-radius:3px;min-width:50px;text-align:center;font-weight:500;white-space:nowrap}
+.b-on{background:rgba(119,153,64,.1);color:var(--grn);border:1px solid rgba(119,153,64,.25)}
+.b-off{background:rgba(221,119,119,.1);color:var(--red);border:1px solid rgba(221,119,119,.25)}
+.ca{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+.bt{padding:3px 8px;font-size:.72rem;border:1px solid var(--br2);background:transparent;color:var(--t1);cursor:pointer;border-radius:3px;transition:all .12s;white-space:nowrap}.bt:hover{border-color:var(--accent);color:var(--t0)}
+.bt-d:hover{border-color:var(--red);color:var(--red)}.bt-s:hover{border-color:var(--yel);color:var(--yel)}
+.bt-p{background:var(--accent);color:#fff;border-color:var(--accent)}.bt-p:hover{opacity:.9}
+.bt-g{background:rgba(119,153,64,.15);color:var(--grn);border:1px solid rgba(119,153,64,.3)}
+.emp{text-align:center;padding:30px;color:var(--t2);font-size:.85rem}
+.mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px;cursor:pointer}.mbg.on{display:flex}
+.md{background:var(--b1);border:1px solid var(--br2);padding:20px;width:420px;max-width:100%;border-radius:6px;cursor:default}
+.md h2{font-size:.95rem;margin-bottom:12px;font-weight:600}
+.fg{margin-bottom:10px}.fg label{display:block;font-size:.75rem;color:var(--t2);margin-bottom:3px}
+.fg input,.fg select{width:100%;padding:6px 9px;background:var(--b2);border:1px solid var(--br1);color:var(--t0);font-size:.82rem;border-radius:3px}.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
 .fa{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-#addBtn{position:fixed;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:50;border:none;cursor:pointer}#addBtn:hover{opacity:.9}
-.log-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:none;align-items:center;justify-content:center;padding:16px;cursor:pointer}.log-bg.on{display:flex}
-.log-box{background:var(--bg-1);border:1px solid var(--border-2);padding:14px;width:100%;max-width:700px;max-height:75vh;display:flex;flex-direction:column;border-radius:6px;cursor:default}
-.log-box pre{flex:1;overflow:auto;font-family:ui-monospace,Courier New,monospace;font-size:.72rem;color:var(--text-1);white-space:pre-wrap;word-break:break-all}
-#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
-.login-box{background:var(--bg-1);border:1px solid var(--border-2);padding:24px 28px;width:320px;max-width:100%;border-radius:6px}
-.login-box h1{text-align:center;margin-bottom:14px;font-size:1.05rem}
-.login-box .logo{text-align:center;font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.login-box .logo span{color:var(--text-2)}
-.thm{padding:4px 8px;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px;font-size:.72rem}.thm:hover{border-color:var(--accent);color:var(--text-0)}
-@media(max-width:600px){.card{flex-direction:column;align-items:flex-start;gap:6px}.card-actions{margin-left:0;width:100%}.card-actions .btn{flex:1}.nav-tabs{overflow-x:auto}.nav-tab{padding:6px 10px;font-size:.78rem}.stats{display:none}}
+#ab{position:fixed;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:50;border:none;cursor:pointer}#ab:hover{opacity:.9}
+.lbg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:none;align-items:center;justify-content:center;padding:16px;cursor:pointer}.lbg.on{display:flex}
+.lb{background:var(--b1);border:1px solid var(--br2);padding:14px;width:100%;max-width:700px;max-height:75vh;display:flex;flex-direction:column;border-radius:6px;cursor:default}
+.lb pre{flex:1;overflow:auto;font-family:ui-monospace,monospace;font-size:.72rem;color:var(--t1);white-space:pre-wrap;word-break:break-all}
+#lp{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+.lx{background:var(--b1);border:1px solid var(--br2);padding:24px 28px;width:320px;max-width:100%;border-radius:6px}
+.lx h1{text-align:center;margin-bottom:14px;font-size:1.05rem}
+.lx .logo{text-align:center;font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.lx .logo span{color:var(--t2)}
+.th{padding:4px 8px;border:1px solid var(--br2);background:transparent;color:var(--t1);cursor:pointer;border-radius:3px;font-size:.72rem}.th:hover{border-color:var(--accent);color:var(--t0)}
+@media(max-width:600px){.c{flex-direction:column;align-items:flex-start;gap:6px}.ca{margin-left:0;width:100%}.ca .bt{flex:1}.nt{overflow-x:auto}.ntb{padding:6px 10px;font-size:.78rem}.st{display:none}}
 </style>
 </head>
 <body>
-<div id="loginPage">
-  <div class="login-box">
+<div id="lp">
+  <div class="lx">
     <div class="logo">deploy<span>-stack</span></div>
     <h1>Sign In</h1>
-    <div class="fg"><label>Username</label><input id="iUser" placeholder="admin" autocomplete="username"></div>
-    <div class="fg"><label>Password</label><input id="iPass" type="password" placeholder="password" autocomplete="current-password"></div>
-    <div style="margin-top:16px"><button class="btn btn-p" style="width:100%;padding:9px;font-size:.88rem" onclick="login()">Sign In</button></div>
-    <div style="text-align:center;margin-top:10px"><button class="thm" onclick="cycleTheme()">theme</button></div>
+    <div class="fg"><label>Username</label><input id="iU" placeholder="admin" autocomplete="username"></div>
+    <div class="fg"><label>Password</label><input id="iP" type="password" placeholder="password" autocomplete="current-password"></div>
+    <div style="margin-top:16px"><button class="bt bt-p" style="width:100%;padding:9px;font-size:.88rem" onclick="doLogin()">Sign In</button></div>
+    <div style="text-align:center;margin-top:10px"><button class="th" id="lth" onclick="cycleTheme()"></button></div>
   </div>
 </div>
-<div id="mainPage" style="display:none">
-  <nav class="nav"><div class="nav-inner">
+<div id="mp" style="display:none">
+  <nav class="nav"><div class="ni">
     <div class="logo">deploy<span>-stack</span></div>
-    <div class="nav-tabs">
-      <div class="nav-tab active" onclick="tab('sites')">Sites</div>
-      <div class="nav-tab" onclick="tab('cluster')">Cluster</div>
-      <div class="nav-tab" onclick="tab('runners')">Runners</div>
+    <div class="nt">
+      <div class="ntb a" onclick="tab('sites')">Sites</div>
+      <div class="ntb" onclick="tab('cluster')">Cluster</div>
+      <div class="ntb" onclick="tab('runners')">Runners</div>
     </div>
-    <div class="stats">
-      <span>Sites: <b id="nS">0</b></span>
-      <span>Servers: <b id="nSRV">0</b></span>
-      <span>Runners: <b id="nR">0</b></span>
-    </div>
-    <a href="/api/v1/docs" target="_blank" style="color:var(--text-1);font-size:.76rem;text-decoration:none">API</a>
-    <button class="thm" onclick="cycleTheme()">theme</button>
+    <div class="st"><span>Sites: <b id="nS">0</b></span><span>Servers: <b id="nSR">0</b></span><span>Runners: <b id="nR">0</b></span></div>
+    <button class="th" id="mth" onclick="cycleTheme()"></button>
   </div></nav>
-  <div class="wrap">
-    <div id="p-sites"><div id="sites"></div><div id="empty" class="empty">No sites. Click + to add one.</div></div>
-    <div id="p-cluster" style="display:none">
-      <div class="section-head"><span class="section-title">Remote servers</span><button class="btn btn-g" onclick="showModal('mServer')">+ Add Server</button><button class="btn" onclick="loadCluster()">Refresh</button></div>
-      <div id="servers"></div><div id="srvEmpty" class="empty">No servers. Add one to manage remotely.</div>
-    </div>
-    <div id="p-runners" style="display:none">
-      <div class="section-head"><span class="section-title">Runners</span><button class="btn btn-g" onclick="showModal('mRunner')">+ Add Runner</button></div>
-      <div id="runners"></div><div id="rEmpty" class="empty">No runners.</div>
-    </div>
+  <div class="w">
+    <div id="p-sites"><div id="sites"></div><div id="se" class="emp">No sites. Click + to add.</div></div>
+    <div id="p-cluster" style="display:none"><div class="sh"><span class="sh-t">Remote servers</span><button class="bt" onclick="loadCluster()">Refresh</button></div><div id="servers"></div><div id="sre" class="emp">No servers. Click + to add.</div></div>
+    <div id="p-runners" style="display:none"><div class="sh"><span class="sh-t">Runners</span><button class="bt" onclick="loadRunners()">Refresh</button></div><div id="runners"></div><div id="re" class="emp">No runners. Click + to add.</div></div>
   </div>
-  <button id="addBtn" onclick="showModal('mSite')">+</button>
+  <button id="ab" onclick="addClick()"></button>
 </div>
-<div class="modal-bg" id="mSite" onclick="if(event.target===this)hideModal('mSite')"><div class="modal">
-  <h2>Deploy Site</h2>
+<!-- Site modal -->
+<div class="mbg" id="mSite" onclick="if(event.target===this)hideModal('mSite')"><div class="md">
+  <h2 id="mSiteH">Deploy Site</h2>
   <div class="fg"><label>Name</label><input id="fN" placeholder="mysite"></div>
   <div class="fg"><label>Directory</label><input id="fD" placeholder="/var/www/mysite"></div>
   <div class="fg"><label>Port</label><input id="fP" type="number" placeholder="auto"></div>
   <div class="fg"><label>Type</label><select id="fT"><option value="">auto-detect</option><option value="static">static</option><option value="php">PHP</option><option value="python">Python</option><option value="node">Node.js</option><option value="go">Go</option><option value="rust">Rust</option></select></div>
-  <div class="fa"><button class="btn" onclick="hideModal('mSite')">Cancel</button><button class="btn btn-p" onclick="addSite()">Deploy</button></div>
+  <div class="fa"><button class="bt" onclick="hideModal('mSite')">Cancel</button><button class="bt bt-p" id="mSiteBtn" onclick="addSite()">Deploy</button></div>
 </div></div>
-<div class="modal-bg" id="mServer" onclick="if(event.target===this)hideModal('mServer')"><div class="modal">
-  <h2>Add Server</h2>
+<!-- Server modal -->
+<div class="mbg" id="mSrv" onclick="if(event.target===this)hideModal('mSrv')"><div class="md">
+  <h2 id="mSrvH">Add Server</h2>
   <div class="fg"><label>Name</label><input id="sN" placeholder="prod-1"></div>
   <div class="fg"><label>Host</label><input id="sH" placeholder="10.0.0.3"></div>
   <div class="fg"><label>API Port</label><input id="sP" type="number" value="3000"></div>
   <div class="fg"><label>Login</label><input id="sU" placeholder="admin"></div>
   <div class="fg"><label>Password</label><input id="sW" type="password"></div>
-  <div class="fa"><button class="btn" onclick="hideModal('mServer')">Cancel</button><button class="btn btn-p" onclick="addServer()">Connect</button></div>
+  <div class="fa"><button class="bt" onclick="hideModal('mSrv')">Cancel</button><button class="bt bt-p" id="mSrvBtn" onclick="addServer()">Connect</button></div>
 </div></div>
-<div class="modal-bg" id="mRunner" onclick="if(event.target===this)hideModal('mRunner')"><div class="modal">
-  <h2>Add Runner</h2>
+<!-- Runner modal -->
+<div class="mbg" id="mRun" onclick="if(event.target===this)hideModal('mRun')"><div class="md">
+  <h2 id="mRunH">Add Runner</h2>
   <div class="fg"><label>Name</label><input id="rN" placeholder="runner-1"></div>
   <div class="fg"><label>Forgejo URL</label><input id="rU" placeholder="https://forgejo.example.com"></div>
   <div class="fg"><label>Token</label><input id="rT" placeholder="registration token"></div>
   <div class="fg"><label>Labels</label><input id="rL" value="my-site:host"></div>
-  <div class="fa"><button class="btn" onclick="hideModal('mRunner')">Cancel</button><button class="btn btn-p" onclick="addRunner()">Create</button></div>
+  <div class="fa"><button class="bt" onclick="hideModal('mRun')">Cancel</button><button class="bt bt-p" id="mRunBtn" onclick="addRunner()">Create</button></div>
 </div></div>
-<div class="log-bg" id="mLog" onclick="if(event.target===this)hideModal('mLog')"><div class="log-box">
-  <button class="btn" onclick="hideModal('mLog')" style="align-self:flex-end;margin-bottom:6px">Close</button>
-  <pre id="logBody"></pre>
+<!-- Logs -->
+<div class="lbg" id="mLog" onclick="if(event.target===this)hideModal('mLog')"><div class="lb">
+  <button class="bt" onclick="hideModal('mLog')" style="align-self:flex-end;margin-bottom:6px">Close</button>
+  <pre id="lb"></pre>
 </div></div>
 <script>
-var TH=["dark","light","black"];
-function setTheme(t){document.documentElement.dataset.theme=t;localStorage.setItem("ds-t",t);document.querySelectorAll(".thm").forEach(function(b){b.textContent=t})}
-function cycleTheme(){var c=document.documentElement.dataset.theme||"dark";setTheme(TH[(TH.indexOf(c)+1)%TH.length])}
-setTheme(localStorage.getItem("ds-t")||"dark");
+/* ── Icons ── */
+var IS='☀️',IM='🌙',ID='⬛';
+function setTheme(t){document.documentElement.dataset.theme=t;localStorage.setItem('ds-t',t);var i=t==='dark'?IS:t==='light'?IM:ID;document.querySelectorAll('.th').forEach(function(b){b.textContent=i})}
+function cycleTheme(){var cs=['dark','light','black'],c=document.documentElement.dataset.theme||'dark';setTheme(cs[(cs.indexOf(c)+1)%cs.length])}
+setTheme(localStorage.getItem('ds-t')||'dark');
 
-var T=localStorage.getItem("ds-tk")||"";
-function api(m,p,b){var o={method:m,headers:{"Content-Type":"application/json"}};if(T)o.headers.Authorization="Bearer "+T;if(b)o.body=JSON.stringify(b);return fetch(p,o).then(function(r){if(r.status===401){showLogin();throw 0}return r.json()})}
-function login(){fetch("/api/v1/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("iUser").value,password:$("iPass").value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem("ds-tk",T);showMain()}else alert(d.error||"Error")}).catch(function(){alert("Error")})}
-function showLogin(){$("loginPage").style.display="flex";$("mainPage").style.display="none"}
-function showMain(){$("loginPage").style.display="none";$("mainPage").style.display="block";loadAll()}
-function loadAll(){loadSites();loadCluster();loadRunners()}
+/* ── Auth ── */
+var T=localStorage.getItem('ds-tk')||'';
+function api(m,p,b){var o={method:m,headers:{'Content-Type':'application/json'}};if(T)o.headers.Authorization='Bearer '+T;if(b)o.body=JSON.stringify(b);return fetch(p,o).then(function(r){if(r.status===401){showLogin();throw 0}return r.json()})}
+function doLogin(){fetch('/api/v1/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('iU').value,password:$('iP').value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem('ds-tk',T);showMain()}else alert(d.error||'Error')}).catch(function(){alert('Error')})}
+function showLogin(){$('lp').style.display='flex';$('mp').style.display='none'}
+function showMain(){$('lp').style.display='none';$('mp').style.display='block';loadAll()}
 
-var tabs=["sites","cluster","runners"];
-function tab(n){tabs.forEach(function(t,i){document.querySelectorAll(".nav-tab")[i].classList.toggle("active",t===n)});["p-sites","p-cluster","p-runners"].forEach(function(p,i){$(p).style.display=tabs[i]===n?"block":"none"})}
+/* ── Tabs + Plus button ── */
+var curTab='sites';
+function tab(n){curTab=n;document.querySelectorAll('.ntb').forEach(function(t,i){t.classList.toggle('a',['sites','cluster','runners'][i]===n)});['p-sites','p-cluster','p-runners'].forEach(function(p,i){$(p).style.display=['sites','cluster','runners'][i]===n?'block':'none'});updateAddBtn();loadTab()}
+function updateAddBtn(){$('ab').textContent=curTab==='sites'?'+':curTab==='cluster'?'+':'+'}
+function loadTab(){if(curTab==='sites')loadSites();if(curTab==='cluster')loadCluster();if(curTab==='runners')loadRunners()}
+function addClick(){if(curTab==='sites')showModal('mSite');if(curTab==='cluster')showModal('mSrv');if(curTab==='runners')showModal('mRun')}
 
 /* ── Sites ── */
-function loadSites(){api("GET","/api/v1/sites").then(function(s){s=s||[];$("nS").textContent=s.length;$("empty").style.display=s.length?"none":"block";$("sites").innerHTML=s.map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.type||"?")+'</div><div class="card-val">:'+(x.port||"?")+'</div><div class="badge badge-'+(x.status==="running"?"on":"off")+'">'+esc(x.status)+'</div><div class="card-actions"><button class="btn" onclick="showLogs(\''+esc(x.name)+'\')">Logs</button><button class="btn" onclick="restart(\''+esc(x.name)+'\')">Restart</button><button class="btn btn-s" onclick="stop(\''+esc(x.name)+'\')">Stop</button><button class="btn btn-d" onclick="rmSite(\''+esc(x.name)+'\')">Remove</button></div></div>'}).join("")}).catch(function(e){console.error(e)})}
-function addSite(){var n=$("fN").value;if(!n)return alert("Name required");api("POST","/api/v1/sites",{name:n,dir:$("fD").value||"/var/www/"+n,port:parseInt($("fP").value)||0,type:$("fT").value}).then(function(){hideModal("mSite");setTimeout(loadSites,2000)})}
-function rmSite(n){if(!confirm("Remove "+n+"?"))return;api("DELETE","/api/v1/sites/"+n+"/remove").then(function(){setTimeout(loadSites,1000)})}
-function restart(n){api("POST","/api/v1/sites/"+n+"/restart").then(function(){setTimeout(loadSites,2000)})}
-function stop(n){api("POST","/api/v1/sites/"+n+"/stop").then(function(){setTimeout(loadSites,2000)})}
-function showLogs(n){fetch("/api/v1/sites/"+n+"/logs",{headers:T?{Authorization:"Bearer "+T}:{}}).then(function(r){return r.text()}).then(function(t){$("logBody").textContent=t;$("mLog").classList.add("on")})}
+function loadSites(){api('GET','/api/v1/sites').then(function(s){s=s||[];$('nS').textContent=s.length;$('se').style.display=s.length?'none':'block';$('sites').innerHTML=s.map(function(x){return'<div class="c"><div class="cn">'+esc(x.name)+'</div><div class="cm">'+esc(x.type||'?')+'</div><div class="cv">'+(x.port?':'+x.port:'')+'</div><div class="b b-'+(x.status==='running'?'on':'off')+'">'+esc(x.status)+'</div><div class="ca"><button class="bt" onclick="showLogs(\''+esc(x.name)+'\')">Logs</button><button class="bt" onclick="restart(\''+esc(x.name)+'\')">Restart</button><button class="bt bt-s" onclick="stop(\''+esc(x.name)+'\')">Stop</button><button class="bt" onclick="start(\''+esc(x.name)+'\')">Start</button><button class="bt bt-d" onclick="rmSite(\''+esc(x.name)+'\')">Remove</button></div></div>'}).join('')}).catch(function(e){console.error(e)})}
+function addSite(){var n=$('fN').value;if(!n)return alert('Name required');api('POST','/api/v1/sites',{name:n,dir:$('fD').value||'/var/www/'+n,port:parseInt($('fP').value)||0,type:$('fT').value}).then(function(){hideModal('mSite');setTimeout(loadSites,2000)})}
+function rmSite(n){if(!confirm('Remove '+n+'?'))return;api('DELETE','/api/v1/sites/'+n+'/remove').then(function(){setTimeout(loadSites,1000)})}
+function restart(n){api('POST','/api/v1/sites/'+n+'/restart').then(function(){setTimeout(loadSites,2000)})}
+function stop(n){api('POST','/api/v1/sites/'+n+'/stop').then(function(){setTimeout(loadSites,2000)})}
+function start(n){api('POST','/api/v1/sites/'+n+'/start').then(function(){setTimeout(loadSites,2000)})}
+function showLogs(n){fetch('/api/v1/sites/'+n+'/logs',{headers:T?{Authorization:'Bearer '+T}:{}}).then(function(r){return r.text()}).then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
 
 /* ── Cluster ── */
-function loadCluster(){api("GET","/api/v1/servers").then(function(s){s=s||[];$("nSRV").textContent=s.length;$("srvEmpty").style.display=s.length?"none":"block";$("servers").innerHTML=s.map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.host)+':'+x.port+'</div><div class="badge badge-'+(x.online?"on":"off")+'">'+(x.online?"online":"offline")+'</div><div class="card-actions"><button class="btn" onclick="remoteSites(\''+esc(x.id)+'\')">Sites</button><button class="btn" onclick="remoteRunners(\''+esc(x.id)+'\')">Runners</button><button class="btn btn-d" onclick="rmServer(\''+esc(x.id)+'\')">Remove</button></div></div>'}).join("")}).catch(function(){})}
-function addServer(){var n=$("sN").value,h=$("sH").value;if(!n||!h)return alert("Name and host required");api("POST","/api/v1/servers",{name:n,host:h,port:parseInt($("sP").value)||3000,user:$("sU").value,pass:$("sW").value}).then(function(){hideModal("mServer");setTimeout(loadCluster,1000)})}
-function rmServer(id){if(!confirm("Remove server?"))return;api("DELETE","/api/v1/servers/"+id).then(function(){loadCluster()})}
-function remoteSites(id){api("GET","/api/v1/servers/"+id+"/sites").then(function(s){$("logBody").textContent=JSON.stringify(s,null,2);$("mLog").classList.add("on")}).catch(function(e){$("logBody").textContent="Error: "+e;$("mLog").classList.add("on")})}
-function remoteRunners(id){api("GET","/api/v1/servers/"+id+"/runners").then(function(s){$("logBody").textContent=JSON.stringify(s,null,2);$("mLog").classList.add("on")}).catch(function(e){$("logBody").textContent="Error: "+e;$("mLog").classList.add("on")})}
+function loadCluster(){api('GET','/api/v1/servers').then(function(s){s=s||[];$('nSR').textContent=s.length;$('sre').style.display=s.length?'none':'block';$('servers').innerHTML=s.map(function(x){return'<div class="c"><div class="cn">'+esc(x.name)+'</div><div class="cm">'+esc(x.host)+':'+x.port+'</div><div class="b b-'+(x.online?'on':'off')+'">'+(x.online?'online':'offline')+'</div><div class="ca"><button class="bt" onclick="remoteSites(\''+esc(x.id)+'\')">Sites</button><button class="bt" onclick="remoteRunners(\''+esc(x.id)+'\')">Runners</button><button class="bt bt-d" onclick="rmServer(\''+esc(x.id)+'\')">Remove</button></div></div>'}).join('')}).catch(function(){})}
+function addServer(){var n=$('sN').value,h=$('sH').value;if(!n||!h)return alert('Name and host required');api('POST','/api/v1/servers',{name:n,host:h,port:parseInt($('sP').value)||3000,user:$('sU').value,pass:$('sW').value}).then(function(){hideModal('mSrv');setTimeout(loadCluster,1000)})}
+function rmServer(id){if(!confirm('Remove server?'))return;api('DELETE','/api/v1/servers/'+id).then(function(){loadCluster()})}
+function remoteSites(id){api('GET','/api/v1/servers/'+id+'/sites').then(function(s){$('lb').textContent=JSON.stringify(s,null,2);$('mLog').classList.add('on')}).catch(function(e){$('lb').textContent='Error: '+e;$('mLog').classList.add('on')})}
+function remoteRunners(id){api('GET','/api/v1/servers/'+id+'/runners').then(function(s){$('lb').textContent=JSON.stringify(s,null,2);$('mLog').classList.add('on')}).catch(function(e){$('lb').textContent='Error: '+e;$('mLog').classList.add('on')})}
 
 /* ── Runners ── */
-function loadRunners(){api("GET","/api/v1/runners").then(function(r){r=r||[];$("nR").textContent=r.length;$("rEmpty").style.display=r.length?"none":"block";$("runners").innerHTML=r.map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.image||"")+'</div><div class="badge badge-'+(x.status==="running"?"on":"off")+'">'+esc(x.status)+'</div><div class="card-actions"><button class="btn" onclick="restartRunner(\''+esc(x.name)+'\')">Restart</button><button class="btn btn-d" onclick="rmRunner(\''+esc(x.name)+'\')">Remove</button></div></div>'}).join("")}).catch(function(){})}
-function addRunner(){var n=$("rN").value,u=$("rU").value,t=$("rT").value;if(!n||!u||!t)return alert("Fill all fields");api("POST","/api/v1/runners/add",{name:n,url:u,token:t,labels:$("rL").value}).then(function(){hideModal("mRunner");setTimeout(loadRunners,2000)})}
-function rmRunner(n){if(!confirm("Remove "+n+"?"))return;api("DELETE","/api/v1/runners/"+n).then(function(){setTimeout(loadRunners,1000)})}
-function restartRunner(n){api("POST","/api/v1/runners/"+n+"/restart").then(function(){setTimeout(loadRunners,2000)})}
+function loadRunners(){api('GET','/api/v1/runners').then(function(r){r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';$('runners').innerHTML=r.map(function(x){return'<div class="c"><div class="cn">'+esc(x.name)+'</div><div class="cm">'+esc(x.image||'')+'</div><div class="b b-'+(x.status==='running'?'on':'off')+'">'+esc(x.status)+'</div><div class="ca"><button class="bt" onclick="restartRunner(\''+esc(x.name)+'\')">Restart</button><button class="bt bt-s" onclick="stopRunner(\''+esc(x.name)+'\')">Stop</button><button class="bt bt-d" onclick="rmRunner(\''+esc(x.name)+'\')">Remove</button></div></div>'}).join('')}).catch(function(){})}
+function addRunner(){var n=$('rN').value,u=$('rU').value,t=$('rT').value;if(!n||!u||!t)return alert('Fill all fields');api('POST','/api/v1/runners/add',{name:n,url:u,token:t,labels:$('rL').value}).then(function(){hideModal('mRun');setTimeout(loadRunners,2000)})}
+function rmRunner(n){if(!confirm('Remove '+n+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){setTimeout(loadRunners,1000)})}
+function restartRunner(n){api('POST','/api/v1/runners/'+n+'/restart').then(function(){setTimeout(loadRunners,2000)})}
+function stopRunner(n){api('POST','/api/v1/runners/'+n+'/stop').then(function(){setTimeout(loadRunners,2000)})}
 
 /* ── Helpers ── */
 function $(id){return document.getElementById(id)}
-function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
-function showModal(id){$(id).classList.add("on")}
-function hideModal(id){$(id).classList.remove("on")}
-if(T)api("GET","/api/v1/status").then(function(){showMain()}).catch(function(){showLogin()});else showLogin();
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function showModal(id){$(id).classList.add('on')}
+function hideModal(id){$(id).classList.remove('on')}
+function loadAll(){loadSites();loadCluster();loadRunners()}
+if(T)api('GET','/api/v1/status').then(function(){showMain()}).catch(function(){showLogin()});else showLogin();
 </script>
 </body>
 </html>

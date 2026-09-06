@@ -659,6 +659,14 @@ func main() {
 	case "status": dockerCompose("ps")
 	case "up":     dockerCompose("up", "-d")
 	case "down":   dockerCompose("down")
+	case "serve":
+		port := 3000
+		for i, a := range os.Args {
+			if a == "--port" && i+1 < len(os.Args) {
+				port, _ = strconv.Atoi(os.Args[i+1])
+			}
+		}
+		startWebServer(port)
 	default:
 		fmt.Print(`deploy-stack — Universal site deployer
 

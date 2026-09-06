@@ -11,6 +11,16 @@ import (
 	"strings"
 )
 
+var templates = map[string]string{
+	"static": "Static HTML/CSS/JS (nginx)",
+	"php":    "PHP 8.2 (php-fpm)",
+	"python": "Python 3.12 (gunicorn)",
+	"node":   "Node.js 20",
+	"go":     "Go (compiled binary)",
+}
+
+var defaultPorts = map[string]int{"static": 8080, "php": 9000, "python": 8000, "node": 3000, "go": 8080}
+
 func stackDir() string   { ex, _ := os.Executable(); return filepath.Dir(ex) }
 func composePath() string { return filepath.Join(stackDir(), "docker-compose.yml") }
 
@@ -403,6 +413,7 @@ func defaultCompose() string {
 
 func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
 	tmpl := filepath.Join(stackDir(), "templates", lang.Template)
+	safeName := strings.ToLower(name)
 
 	// Check if project has its own Dockerfile
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
@@ -419,9 +430,9 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     volumes:
       - %s:/usr/share/nginx/html:ro
       - %s/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-`, name, name, port, dir, tmpl)
+`, safeName, safeName, port, dir, tmpl)
 	case "php":
-		s := name + "-php"
+		s := safeName + "-php"
 		return fmt.Sprintf(`  %s:
     build: %s
     container_name: %s
@@ -438,13 +449,26 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     ports: ["127.0.0.1:%d:8080"]
     volumes:
       - %s:/app
-`, name, tmpl, name, port, dir)
+`, safeName, tmpl, safeName, port, dir)
 	}
 }
 
 func removeService(content, name string) string {
 	for _, s := range []string{name, name + "-php", name + "-node", name + "-go", name + "-python", name + "-rust", name + "-jvm", name + "-dotnet", name + "-ruby", name + "-bun", name + "-deno"} {
-		content = regexp.MustCompile(`(?m)\n  `+regexp.QuoteMeta(s)+`:.*?(?=\n  \w|\z)`).ReplaceAllString(content, "")
+		re := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(s) + `:.*`)
+		loc := re.FindStringIndex(content)
+		if loc == nil { continue }
+		start := loc[0]
+		end := loc[1]
+		for end < len(content) {
+			if end >= len(content) { break }
+			if content[end] == '\n' {
+				if end+1 < len(content) && content[end+1] == ' ' { end++; continue }
+				break
+			}
+			end++
+		}
+		content = content[:start] + content[end:]
 	}
 	return content
 }
@@ -564,11 +588,15 @@ func main() {
 
 	switch os.Args[1] {
 	case "add":
-		if len(os.Args) < 4 { fmt.Println("Usage: deploy add <name> <dir> [--port N]"); return }
+		if len(os.Args) < 4 { fmt.Println("Usage: deploy add <name> <dir> [--port N] [--type TYPE]"); return }
 		name, dir := os.Args[2], os.Args[3]
 		lang := detectLang(dir); port := freePort(lang.Port)
 		for i, a := range os.Args {
 			if a == "--port" && i+1 < len(os.Args) { port, _ = strconv.Atoi(os.Args[i+1]) }
+			if a == "--type" && i+1 < len(os.Args) {
+				tp := os.Args[i+1]
+				if _, ok := templates[tp]; ok { lang = LangInfo{tp, tp, defaultPorts[tp], nil} }
+			}
 		}
 		fmt.Printf("Adding %s (%s) port %d...\n", name, lang.Name, port)
 		c := readCompose(); c = removeService(c, name)
@@ -576,6 +604,29 @@ func main() {
 		writeCompose(c)
 		svc := name; if lang.Name == "php" { svc = name + "-php" }
 		dockerCompose("up", "-d", "--build", svc)
+
+		// Auto-migration: detect and run migration scripts
+		migrations := []string{
+			filepath.Join(dir, "install", "migrate.sh"),
+			filepath.Join(dir, "migrate.sh"),
+			filepath.Join(dir, "db", "migrate.sh"),
+		}
+		for _, m := range migrations {
+			if _, err := os.Stat(m); err == nil {
+				fmt.Printf("  Running migration: %s\n", filepath.Base(filepath.Dir(m)))
+				cmd := exec.Command("docker", "exec", svc, "sh", m)
+				cmd.Stdout = os.Stdout; cmd.Stderr = os.Stderr
+				cmd.Run()
+				break
+			}
+		}
+		// Laravel artisan migrate
+		if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
+			fmt.Println("  Running: php artisan migrate --force")
+			cmd := exec.Command("docker", "exec", svc, "php", "/var/www/"+name+"/artisan", "migrate", "--force")
+			cmd.Stdout = os.Stdout; cmd.Stderr = os.Stderr
+			cmd.Run()
+		}
 		fmt.Printf("✓ %s deployed on port %d\n", name, port)
 
 	case "rm":

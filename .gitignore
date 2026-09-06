@@ -1,0 +1,5 @@
+dist/
+deploy
+deploy.exe
+*.exe
+.env

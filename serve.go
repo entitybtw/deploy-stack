@@ -45,6 +45,7 @@ func startWebServer(port int) {
 	auth := NewAuth()
 	hub := &Hub{clients: make(map[chan []byte]struct{})}
 	go hub.Run()
+	cl := NewCluster(filepath.Join(stackDir(), "data"))
 
 	mux := http.NewServeMux()
 
@@ -175,6 +176,10 @@ func startWebServer(port int) {
 		json.NewEncoder(w).Encode(runners)
 	}))
 
+	// Cluster management
+	mux.HandleFunc("/api/v1/servers", authReq(cl.handleServers))
+	mux.HandleFunc("/api/v1/servers/", authReq(cl.handleServer))
+
 	mux.HandleFunc("/api/v1/status", authReq(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"sites":   listSites(),
@@ -246,9 +251,36 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, name string) {
 	w.Write(data)
 }
 
+func getContainerStatus(name string) string {
+	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", name)
+	out, err := cmd.Output()
+	if err != nil {
+		return "stopped"
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func jsonResp(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
+
+func jsonErr(w http.ResponseWriter, msg string, code int) {
+	w.WriteHeader(code)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func jsonDec(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
+}
+
 func listSites() []map[string]interface{} {
-	content := readCompose()
+	seen := make(map[string]bool)
 	var sites []map[string]interface{}
+
+	// From docker-compose.yml
+	content := readCompose()
 	re := regexp.MustCompile(`(?m)^  (\S+):`)
 	for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
 		name := content[m[2]:m[3]]
@@ -263,15 +295,39 @@ func listSites() []map[string]interface{} {
 		if pm := regexp.MustCompile(`127\.0\.0\.1:(\d+):`).FindStringSubmatch(block); len(pm) > 1 {
 			port, _ = strconv.Atoi(pm[1])
 		}
-		status := "unknown"
-		cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", name)
-		if out, err := cmd.Output(); err == nil {
-			status = strings.TrimSpace(string(out))
-		}
+		status := getContainerStatus(name)
 		sites = append(sites, map[string]interface{}{
 			"name": name, "port": port, "status": status,
 			"type": "static", "dir": "/var/www/" + name,
 		})
+		seen[name] = true
 	}
+
+	// Also find running containers not in compose
+	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}")
+	if out, err := cmd.Output(); err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			parts := strings.SplitN(line, "|", 3)
+			if len(parts) < 2 {
+				continue
+			}
+			name := parts[0]
+			if name == "runner" || strings.HasPrefix(name, "runner-") || strings.Contains(name, "docker_dind") || strings.Contains(name, "forgejo") {
+				continue
+			}
+			if seen[name] {
+				continue
+			}
+			port := 0
+			if pm := regexp.MustCompile(`127\.0\.0\.1:(\d+):`).FindStringSubmatch(parts[2]); len(pm) > 1 {
+				port, _ = strconv.Atoi(pm[1])
+			}
+			sites = append(sites, map[string]interface{}{
+				"name": name, "port": port, "status": "running",
+				"type": "docker", "dir": "/var/www/" + name,
+			})
+		}
+	}
+
 	return sites
 }

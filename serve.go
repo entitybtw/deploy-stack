@@ -155,7 +155,24 @@ func startWebServer(port int) {
 	}))
 
 	mux.HandleFunc("/api/v1/runners", authReq(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(runnerNames())
+		names := runnerNames()
+		var runners []map[string]interface{}
+		for _, name := range names {
+			status := "unknown"
+			cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", name)
+			if out, err := cmd.Output(); err == nil {
+				status = strings.TrimSpace(string(out))
+			}
+			image := ""
+			cmd2 := exec.Command("docker", "inspect", "-f", "{{.Config.Image}}", name)
+			if out, err := cmd2.Output(); err == nil {
+				image = strings.TrimSpace(string(out))
+			}
+			runners = append(runners, map[string]interface{}{
+				"name": name, "status": status, "image": image,
+			})
+		}
+		json.NewEncoder(w).Encode(runners)
 	}))
 
 	mux.HandleFunc("/api/v1/status", authReq(func(w http.ResponseWriter, r *http.Request) {

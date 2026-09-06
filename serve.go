@@ -296,19 +296,24 @@ func startWebServer(port int) {
 }
 
 func serveStaticFile(w http.ResponseWriter, r *http.Request, name string) {
-	ex, _ := os.Executable()
-	staticDir := filepath.Join(filepath.Dir(ex), "static")
-	data, err := os.ReadFile(filepath.Join(staticDir, name))
-	if err != nil {
-		http.Error(w, name+" not found", 404)
-		return
+	// Try multiple paths: next to binary, then /usr/local/share/deploy-stack/static
+	paths := []string{
+		filepath.Join(filepath.Dir(os.Args[0]), "static", name),
+		filepath.Join("/usr/local/share/deploy-stack/static", name),
+		filepath.Join("/root/deploy-stack/static", name),
 	}
-	if strings.HasSuffix(name, ".html") {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	} else {
-		w.Header().Set("Content-Type", "text/plain")
+	for _, p := range paths {
+		if data, err := os.ReadFile(p); err == nil {
+			ct := "text/plain"
+			if strings.HasSuffix(name, ".html") {
+				ct = "text/html; charset=utf-8"
+			}
+			w.Header().Set("Content-Type", ct)
+			w.Write(data)
+			return
+		}
 	}
-	w.Write(data)
+	http.Error(w, name+" not found", 404)
 }
 
 func getContainerStatus(name string) string {

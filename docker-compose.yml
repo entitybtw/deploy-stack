@@ -1,0 +1,13 @@
+services:
+  runner:
+    image: data.forgejo.org/forgejo/runner:4.0.0
+    container_name: runner
+    restart: unless-stopped
+    volumes:
+      - /root/forgejo-runner/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/www:/var/www
+    command: >
+      sh -c "sleep 10 &&
+             apk update && apk add --no-cache nodejs npm &&
+             forgejo-runner daemon --config /data/config.yaml"

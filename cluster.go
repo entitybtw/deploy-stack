@@ -1,13 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -206,13 +206,20 @@ func genShortID() string {
 	return fmt.Sprintf("%x", b)
 }
 
+type Cluster struct {
+	store *ClusterStore
+}
+
+func NewCluster(dataDir string) *Cluster {
+	return &Cluster{store: NewClusterStore(dataDir)}
+}
+
 // Cluster handler for API
-func (c *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
+func (cl *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		// Ping all servers
-		c.cluster.PingAll()
-		jsonResp(w, c.cluster.ListServers())
+		cl.store.PingAll()
+		jsonResp(w, cl.store.ListServers())
 	case "POST":
 		var req struct {
 			Name string `json:"name"`
@@ -228,14 +235,13 @@ func (c *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 		if req.Port == 0 {
 			req.Port = 3000
 		}
-		s := c.cluster.AddServer(req.Name, req.Host, req.Port, req.User, req.Pass)
-		// Try to login
-		c.cluster.LoginServer(s.ID)
+		s := cl.store.AddServer(req.Name, req.Host, req.Port, req.User, req.Pass)
+		cl.store.LoginServer(s.ID)
 		jsonResp(w, map[string]string{"status": "added", "id": s.ID})
 	}
 }
 
-func (c *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
+func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/servers/"), "/")
 	if len(parts) < 1 {
 		jsonErr(w, "invalid", 400)
@@ -244,7 +250,7 @@ func (c *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	id := parts[0]
 
 	if len(parts) > 1 && parts[1] == "sites" {
-		data, err := c.cluster.CallServer(id, "GET", "/api/v1/sites", nil)
+		data, err := cl.store.CallServer(id, "GET", "/api/v1/sites", nil)
 		if err != nil {
 			jsonErr(w, err.Error(), 502)
 			return
@@ -255,12 +261,12 @@ func (c *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "DELETE" {
-		c.cluster.RemoveServer(id)
+		cl.store.RemoveServer(id)
 		jsonResp(w, map[string]string{"status": "removed"})
 		return
 	}
 
-	s := c.cluster.GetServer(id)
+	s := cl.store.GetServer(id)
 	if s == nil {
 		jsonErr(w, "not found", 404)
 		return

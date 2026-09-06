@@ -141,6 +141,18 @@ func startWebServer(port int) {
 			json.NewEncoder(w).Encode(map[string]string{"status": "restarted"})
 			return
 		}
+		if strings.HasSuffix(name, "/stop") {
+			name = strings.TrimSuffix(name, "/stop")
+			dockerCompose("stop", name)
+			json.NewEncoder(w).Encode(map[string]string{"status": "stopped"})
+			return
+		}
+		if strings.HasSuffix(name, "/start") {
+			name = strings.TrimSuffix(name, "/start")
+			dockerCompose("start", name)
+			json.NewEncoder(w).Encode(map[string]string{"status": "started"})
+			return
+		}
 		if strings.HasSuffix(name, "/remove") && r.Method == "DELETE" {
 			name = strings.TrimSuffix(name, "/remove")
 			for _, s := range []string{name, name + "-php"} {
@@ -179,6 +191,40 @@ func startWebServer(port int) {
 	// Cluster management
 	mux.HandleFunc("/api/v1/servers", authReq(cl.handleServers))
 	mux.HandleFunc("/api/v1/servers/", authReq(cl.handleServer))
+
+	// Runner management
+	mux.HandleFunc("/api/v1/runners/add", authReq(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name   string `json:"name"`
+			URL    string `json:"url"`
+			Token  string `json:"token"`
+			Labels string `json:"labels"`
+		}
+		if err := jsonDec(r, &req); err != nil {
+			jsonErr(w, "invalid json", 400)
+			return
+		}
+		addRunner(req.Name, req.Token, req.URL)
+		dockerCompose("up", "-d", req.Name)
+		jsonResp(w, map[string]string{"status": "created", "name": req.Name})
+	}))
+
+	mux.HandleFunc("/api/v1/runners/", authReq(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/api/v1/runners/")
+		if strings.HasSuffix(name, "/restart") {
+			name = strings.TrimSuffix(name, "/restart")
+			dockerCompose("restart", name)
+			jsonResp(w, map[string]string{"status": "restarted"})
+			return
+		}
+		if r.Method == "DELETE" {
+			dockerCompose("stop", name)
+			dockerCompose("rm", name)
+			jsonResp(w, map[string]string{"status": "removed"})
+			return
+		}
+		jsonResp(w, map[string]string{"name": name})
+	}))
 
 	mux.HandleFunc("/api/v1/status", authReq(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -303,12 +349,13 @@ func listSites() []map[string]interface{} {
 		seen[name] = true
 	}
 
-	// Also find running containers not in compose
-	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}")
+	// Also find running containers that were deployed via deploy-stack
+	// (have /var/www in their mounts)
+	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}|{{.Mounts}}")
 	if out, err := cmd.Output(); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-			parts := strings.SplitN(line, "|", 3)
-			if len(parts) < 2 {
+			parts := strings.SplitN(line, "|", 4)
+			if len(parts) < 3 {
 				continue
 			}
 			name := parts[0]
@@ -316,6 +363,14 @@ func listSites() []map[string]interface{} {
 				continue
 			}
 			if seen[name] {
+				continue
+			}
+			// Only include containers with /var/www mount (deploy-stack managed)
+			mounts := ""
+			if len(parts) > 3 {
+				mounts = parts[3]
+			}
+			if !strings.Contains(mounts, "/var/www") {
 				continue
 			}
 			port := 0

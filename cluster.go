@@ -260,6 +260,17 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) > 1 && parts[1] == "runners" {
+		data, err := cl.store.CallServer(id, "GET", "/api/v1/runners", nil)
+		if err != nil {
+			jsonErr(w, err.Error(), 502)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+		return
+	}
+
 	if r.Method == "DELETE" {
 		cl.store.RemoveServer(id)
 		jsonResp(w, map[string]string{"status": "removed"})

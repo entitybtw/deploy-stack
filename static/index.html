@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>deploy-stack</title>
 <style>
-:root{--accent:#7a9db8;--accent-glow:#1a2530;--green:#7a9;--red:#d77;--max-w:900px}
+:root{--accent:#7a9db8;--accent-glow:#1a2530;--green:#7a9;--red:#d77;--max-w:900px;--font-sans:system-ui,-apple-system,sans-serif;--font-mono:ui-monospace,Courier New,monospace}
 [data-theme="dark"]{--bg-0:#0f0f0f;--bg-1:#1a1a1a;--bg-2:#222;--bg-3:#2a2a2a;--text-0:#ddd;--text-1:#999;--text-2:#666;--border-1:#2a2a2a;--border-2:#333}
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,sans-serif;background:var(--bg-0);color:var(--text-0);line-height:1.5}
+[data-theme="light"]{--bg-0:#fafafa;--bg-1:#fff;--bg-2:#f5f5f5;--bg-3:#eee;--text-0:#222;--text-1:#666;--text-2:#999;--border-1:#ddd;--border-2:#ccc}
+[data-theme="black"]{--bg-0:#000;--bg-1:#111;--bg-2:#1a1a1a;--bg-3:#222;--text-0:#eee;--text-1:#aaa;--text-2:#666;--border-1:#222;--border-2:#2a2a2a}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:var(--font-sans);background:var(--bg-0);color:var(--text-0);line-height:1.5}
 .wrap{max-width:var(--max-w);margin:0 auto;padding:16px}
 .nav{padding:12px 0;border-bottom:1px solid var(--border-1);margin-bottom:16px}
 .nav-inner{max-width:var(--max-w);margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:12px}
@@ -15,8 +17,8 @@
 .stats{margin-left:auto;display:flex;gap:16px;font-size:.8rem;color:var(--text-2)}.stats b{color:var(--text-0)}
 .card{background:var(--bg-1);border:1px solid var(--border-1);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:border-color .15s}.card:hover{border-color:var(--border-2)}
 .card-name{font-weight:600;font-size:.9rem;min-width:140px}
-.card-type{font-family:monospace;font-size:.75rem;padding:2px 8px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(122,157,184,.2);border-radius:2px}
-.card-port{font-family:monospace;font-size:.8rem;color:var(--text-1);min-width:60px}
+.card-type{font-family:var(--font-mono);font-size:.75rem;padding:2px 8px;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(122,157,184,.2);border-radius:2px}
+.card-port{font-family:var(--font-mono);font-size:.8rem;color:var(--text-1);min-width:60px}
 .card-status{font-size:.75rem;padding:2px 8px;border-radius:2px;min-width:60px;text-align:center}
 .s-running{background:rgba(119,153,64,.08);color:var(--green);border:1px solid rgba(119,153,64,.2)}
 .s-stopped{background:rgba(221,119,119,.08);color:var(--red);border:1px solid rgba(221,119,119,.2)}
@@ -34,12 +36,13 @@
 #addBtn{position:fixed;bottom:20px;right:20px;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;font-size:1.5rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.3);z-index:50;border:none;cursor:pointer}#addBtn:hover{opacity:.9}
 .logs-box{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}.logs-box.active{display:flex}
 .logs-inner{background:var(--bg-1);border:1px solid var(--border-2);padding:16px;width:650px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;border-radius:6px}
-.logs-inner pre{flex:1;overflow:auto;font-family:monospace;font-size:.75rem;color:var(--text-1);white-space:pre-wrap;word-break:break-all}
+.logs-inner pre{flex:1;overflow:auto;font-family:var(--font-mono);font-size:.75rem;color:var(--text-1);white-space:pre-wrap;word-break:break-all}
 #loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh}
 .login-box{background:var(--bg-1);border:1px solid var(--border-2);padding:24px;width:340px;border-radius:6px}
 .login-box h1{text-align:center;margin-bottom:16px;font-size:1.1rem}
 .login-box .logo{text-align:center;font-size:1.2rem;font-weight:700;color:var(--accent);margin-bottom:16px}
 .login-box .logo span{color:var(--text-2)}
+.theme-btn{padding:4px 9px;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px;font-size:.75rem}.theme-btn:hover{border-color:var(--accent);color:var(--text-0)}
 </style>
 </head>
 <body>
@@ -50,6 +53,7 @@
     <div class="form-row"><label>Username</label><input id="loginUser" placeholder="admin"></div>
     <div class="form-row"><label>Password</label><input id="loginPass" type="password" placeholder="password"></div>
     <div class="form-actions" style="justify-content:center"><button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In</button></div>
+    <div style="text-align:center;margin-top:12px"><button class="theme-btn" onclick="cycleTheme()" id="loginThemeBtn">theme</button></div>
   </div>
 </div>
 <div id="mainPage" style="display:none">
@@ -57,6 +61,7 @@
     <div class="logo">deploy<span>-stack</span></div>
     <div class="stats"><span>Sites: <b id="siteCount">0</b></span><span>Runners: <b id="runnerCount">0</b></span></div>
     <a href="/api/v1/docs" target="_blank" style="color:var(--text-1);font-size:.8rem;text-decoration:none">API Docs</a>
+    <button class="theme-btn" onclick="cycleTheme()" id="mainThemeBtn">theme</button>
   </div></nav>
   <div class="wrap">
     <div id="sites"></div>
@@ -77,6 +82,11 @@
   <pre id="logsContent"></pre>
 </div></div>
 <script>
+var themes=["dark","light","black"];
+function setTheme(t){document.documentElement.dataset.theme=t;localStorage.setItem("ds-theme",t);var b=document.getElementById("mainThemeBtn")||document.getElementById("loginThemeBtn");if(b)b.textContent=t}
+function cycleTheme(){var cur=document.documentElement.dataset.theme||"dark";setTheme(themes[(themes.indexOf(cur)+1)%themes.length])}
+setTheme(localStorage.getItem("ds-theme")||"dark");
+
 var T=localStorage.getItem("dt")||"";
 function api(m,p,b){var o={method:m,headers:{"Content-Type":"application/json"}};if(T)o.headers.Authorization="Bearer "+T;if(b)o.body=JSON.stringify(b);return fetch(p,o).then(function(r){if(r.status===401){showLogin();throw"unauth"}return r.json()})}
 function doLogin(){fetch("/api/v1/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("loginUser").value,password:document.getElementById("loginPass").value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem("dt",T);showMain()}else alert(d.error||"Failed")}).catch(function(){alert("Error")})}

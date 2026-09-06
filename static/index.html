@@ -24,13 +24,13 @@
 .badge{font-size:.72rem;padding:2px 8px;border-radius:3px;min-width:55px;text-align:center;font-weight:500}
 .badge-on{background:rgba(119,153,64,.1);color:var(--green);border:1px solid rgba(119,153,64,.25)}
 .badge-off{background:rgba(221,119,119,.1);color:var(--red);border:1px solid rgba(221,119,119,.25)}
-.badge-unk{background:var(--bg-3);color:var(--text-2);border:1px solid var(--border-1)}
 .card-actions{margin-left:auto;display:flex;gap:5px}
 .btn{padding:4px 10px;font-size:.76rem;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px;transition:all .12s}.btn:hover{border-color:var(--accent);color:var(--text-0)}
 .btn-d:hover{border-color:var(--red);color:var(--red)}.btn-p{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-p:hover{opacity:.9}
+.btn-g{background:rgba(119,153,64,.15);color:var(--green);border:1px solid rgba(119,153,64,.3)}
 .empty{text-align:center;padding:36px;color:var(--text-2);font-size:.88rem}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}.modal-bg.on{display:flex}
-.modal{background:var(--bg-1);border:1px solid var(--border-2);padding:20px;width:400px;max-width:90vw;border-radius:6px}
+.modal{background:var(--bg-1);border:1px solid var(--border-2);padding:20px;width:420px;max-width:90vw;border-radius:6px}
 .modal h2{font-size:.95rem;margin-bottom:12px;font-weight:600}
 .fg{margin-bottom:10px}.fg label{display:block;font-size:.76rem;color:var(--text-2);margin-bottom:3px}
 .fg input,.fg select{width:100%;padding:6px 9px;background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-0);font-size:.83rem;border-radius:3px}.fg input:focus{outline:none;border-color:var(--accent)}
@@ -44,6 +44,7 @@
 .login-box h1{text-align:center;margin-bottom:14px;font-size:1.05rem}
 .login-box .logo{text-align:center;font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.login-box .logo span{color:var(--text-2)}
 .thm{padding:4px 8px;border:1px solid var(--border-2);background:transparent;color:var(--text-1);cursor:pointer;border-radius:3px;font-size:.72rem}.thm:hover{border-color:var(--accent);color:var(--text-0)}
+.section-title{font-size:.82rem;color:var(--text-2);margin-bottom:10px;font-weight:500}
 </style>
 </head>
 <body>
@@ -62,18 +63,39 @@
     <div class="logo">deploy<span>-stack</span></div>
     <div class="nav-tabs">
       <div class="nav-tab active" onclick="tab('sites')">Sites</div>
+      <div class="nav-tab" onclick="tab('cluster')">Cluster</div>
       <div class="nav-tab" onclick="tab('runners')">Runners</div>
     </div>
-    <div class="stats"><span>Sites: <b id="nSites">0</b></span><span>Runners: <b id="nRunners">0</b></span></div>
+    <div class="stats"><span>Sites: <b id="nS">0</b></span><span>Servers: <b id="nSRV">0</b></span></div>
     <a href="/api/v1/docs" target="_blank" style="color:var(--text-1);font-size:.76rem;text-decoration:none">API</a>
     <button class="thm" onclick="cycleTheme()">theme</button>
   </div></nav>
   <div class="wrap">
-    <div id="p-sites"><div id="sites"></div><div id="empty" class="empty">No sites. Click + to add one.</div></div>
-    <div id="p-runners" style="display:none"><div id="runners"></div><div id="rEmpty" class="empty">No runners registered.</div></div>
+    <!-- Sites tab -->
+    <div id="p-sites">
+      <div id="sites"></div>
+      <div id="empty" class="empty">No sites. Click + to add one.</div>
+    </div>
+    <!-- Cluster tab -->
+    <div id="p-cluster" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span class="section-title" style="margin:0">Remote servers</span>
+        <button class="btn btn-g" onclick="showModal('mServer')">+ Add Server</button>
+        <button class="btn" onclick="loadCluster()">Refresh</button>
+      </div>
+      <div id="servers"></div>
+      <div id="srvEmpty" class="empty">No servers added. Click "Add Server" to connect a remote deploy-stack instance.</div>
+    </div>
+    <!-- Runners tab -->
+    <div id="p-runners" style="display:none">
+      <div class="section-title">Local runners</div>
+      <div id="runners"></div>
+      <div id="rEmpty" class="empty">No runners.</div>
+    </div>
   </div>
-  <button id="addBtn" onclick="showModal()">+</button>
+  <button id="addBtn" onclick="showModal('mSite')">+</button>
 </div>
+<!-- Add Site modal -->
 <div class="modal-bg" id="mSite"><div class="modal">
   <h2>Deploy Site</h2>
   <div class="fg"><label>Name</label><input id="fN" placeholder="mysite"></div>
@@ -82,6 +104,17 @@
   <div class="fg"><label>Type</label><input id="fT" placeholder="static / php / python / node / go"></div>
   <div class="fa"><button class="btn" onclick="hideModal('mSite')">Cancel</button><button class="btn btn-p" onclick="addSite()">Deploy</button></div>
 </div></div>
+<!-- Add Server modal -->
+<div class="modal-bg" id="mServer"><div class="modal">
+  <h2>Add Server</h2>
+  <div class="fg"><label>Name</label><input id="sN" placeholder="prod-server"></div>
+  <div class="fg"><label>Host (IP or hostname)</label><input id="sH" placeholder="10.0.0.3"></div>
+  <div class="fg"><label>API Port</label><input id="sP" type="number" value="3000"></div>
+  <div class="fg"><label>Login</label><input id="sU" placeholder="admin"></div>
+  <div class="fg"><label>Password</label><input id="sW" type="password"></div>
+  <div class="fa"><button class="btn" onclick="hideModal('mServer')">Cancel</button><button class="btn btn-p" onclick="addServer()">Connect</button></div>
+</div></div>
+<!-- Logs modal -->
 <div class="log-bg" id="mLog"><div class="log-box">
   <button class="btn" onclick="hideModal('mLog')" style="align-self:flex-end;margin-bottom:6px">Close</button>
   <pre id="logBody"></pre>
@@ -98,17 +131,24 @@ var T=localStorage.getItem("ds-tk")||"";
 function api(m,p,b){var o={method:m,headers:{"Content-Type":"application/json"}};if(T)o.headers.Authorization="Bearer "+T;if(b)o.body=JSON.stringify(b);return fetch(p,o).then(function(r){if(r.status===401){showLogin();throw 0}return r.json()})}
 function login(){fetch("/api/v1/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("iUser").value,password:$("iPass").value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem("ds-tk",T);showMain()}else alert(d.error||"Error")}).catch(function(){alert("Connection error")})}
 function showLogin(){$("loginPage").style.display="flex";$("mainPage").style.display="none"}
-function showMain(){$("loginPage").style.display="none";$("mainPage").style.display="block";loadSites();loadRunners()}
+function showMain(){$("loginPage").style.display="none";$("mainPage").style.display="block";loadSites();loadCluster();loadRunners()}
 
 /* ── tabs ── */
-function tab(n){document.querySelectorAll(".nav-tab").forEach(function(t,i){t.classList.toggle("active",["sites","runners"][i]===n)});$("p-sites").style.display=n==="sites"?"block":"none";$("p-runners").style.display=n==="runners"?"block":"none";if(n==="sites")loadSites();if(n==="runners")loadRunners()}
+var tabs=["sites","cluster","runners"];
+function tab(n){tabs.forEach(function(t,i){document.querySelectorAll(".nav-tab")[i].classList.toggle("active",t===n)});["p-sites","p-cluster","p-runners"].forEach(function(p,i){$(p).style.display=tabs[i]===n?"block":"none"});if(n==="sites")loadSites();if(n==="cluster")loadCluster();if(n==="runners")loadRunners()}
 
 /* ── sites ── */
-function loadSites(){api("GET","/api/v1/sites").then(function(s){$("nSites").textContent=s.length;$("empty").style.display=s.length?"none":"block";$("sites").innerHTML=s.map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.type||"?")+'</div><div class="card-val">:'+x.port+'</div><div class="badge badge-'+(x.status==="running"?"on":"off")+'">'+esc(x.status)+'</div><div class="card-actions"><button class="btn" onclick="showLogs(\''+esc(x.name)+'\')">Logs</button><button class="btn" onclick="restart(\''+esc(x.name)+'\')">Restart</button><button class="btn btn-d" onclick="rmSite(\''+esc(x.name)+'\')">Remove</button></div></div>'}).join("")}).catch(function(){})}
+function loadSites(){api("GET","/api/v1/sites").then(function(s){$("nS").textContent=s.length;$("empty").style.display=s.length?"none":"block";$("sites").innerHTML=s.map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.type||"?")+'</div><div class="card-val">:'+x.port+'</div><div class="badge badge-'+(x.status==="running"?"on":"off")+'">'+esc(x.status)+'</div><div class="card-actions"><button class="btn" onclick="showLogs(\''+esc(x.name)+'\')">Logs</button><button class="btn" onclick="restart(\''+esc(x.name)+'\')">Restart</button><button class="btn btn-d" onclick="rmSite(\''+esc(x.name)+'\')">Remove</button></div></div>'}).join("")}).catch(function(){})}
 function addSite(){var n=$("fN").value;if(!n)return alert("Name required");api("POST","/api/v1/sites",{name:n,dir:$("fD").value||"/var/www/"+n,port:parseInt($("fP").value)||0,type:$("fT").value}).then(function(){hideModal("mSite");setTimeout(loadSites,2000)})}
 function rmSite(n){if(!confirm("Remove "+n+"?"))return;api("DELETE","/api/v1/sites/"+n+"/remove").then(function(){setTimeout(loadSites,1000)})}
 function restart(n){api("POST","/api/v1/sites/"+n+"/restart").then(function(){setTimeout(loadSites,2000)})}
 function showLogs(n){fetch("/api/v1/sites/"+n+"/logs",{headers:T?{Authorization:"Bearer "+T}:{}}).then(function(r){return r.text()}).then(function(t){$("logBody").textContent=t;$("mLog").classList.add("on")})}
+
+/* ── cluster ── */
+function loadCluster(){api("GET","/api/v1/servers").then(function(s){$("nSRV").textContent=s.length;$("srvEmpty").style.display=s.length?"none":"block";$("servers").innerHTML=s.map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.host)+':'+x.port+'</div><div class="badge badge-'+(x.online?"on":"off")+'">'+(x.online?"online":"offline")+'</div><div class="card-actions"><button class="btn" onclick="viewRemoteSites(\''+esc(x.id)+'\')">Sites</button><button class="btn btn-d" onclick="rmServer(\''+esc(x.id)+'\')">Remove</button></div></div>'}).join("")}).catch(function(){})}
+function addServer(){var n=$("sN").value,h=$("sH").value;if(!n||!h)return alert("Name and host required");api("POST","/api/v1/servers",{name:n,host:h,port:parseInt($("sP").value)||3000,user:$("sU").value,pass:$("sW").value}).then(function(){hideModal("mServer");setTimeout(loadCluster,1000)})}
+function rmServer(id){if(!confirm("Remove server?"))return;api("DELETE","/api/v1/servers/"+id).then(function(){loadCluster()})}
+function viewRemoteSites(id){api("GET","/api/v1/servers/"+id+"/sites").then(function(s){$("logBody").textContent=JSON.stringify(s,null,2);$("mLog").classList.add("on")})}
 
 /* ── runners ── */
 function loadRunners(){api("GET","/api/v1/runners").then(function(r){$("nRunners").textContent=r?r.length:0;$("rEmpty").style.display=r&&r.length?"none":"block";$("runners").innerHTML=(r||[]).map(function(x){return'<div class="card"><div class="card-name">'+esc(x.name)+'</div><div class="card-meta">'+esc(x.image||"")+'</div><div class="badge badge-'+(x.status==="running"?"on":"off")+'">'+esc(x.status)+'</div></div>'}).join("")}).catch(function(){})}
@@ -118,8 +158,6 @@ function $(id){return document.getElementById(id)}
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
 function showModal(id){$(id).classList.add("on")}
 function hideModal(id){$(id).classList.remove("on")}
-
-/* ── init ── */
 if(T)api("GET","/api/v1/status").then(function(){showMain()}).catch(function(){showLogin()});else showLogin();
 </script>
 </body>

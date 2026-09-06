@@ -217,6 +217,12 @@ func startWebServer(port int) {
 			jsonResp(w, map[string]string{"status": "restarted"})
 			return
 		}
+		if strings.HasSuffix(name, "/stop") {
+			name = strings.TrimSuffix(name, "/stop")
+			dockerCompose("stop", name)
+			jsonResp(w, map[string]string{"status": "stopped"})
+			return
+		}
 		if r.Method == "DELETE" {
 			dockerCompose("stop", name)
 			dockerCompose("rm", name)
@@ -261,9 +267,9 @@ func startWebServer(port int) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "no matching site"})
 	})
 
-	mux.HandleFunc("/api/v1/docs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/docs", authReq(func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r, "api_docs.html")
-	})
+	}))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {

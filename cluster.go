@@ -12,18 +12,14 @@ import (
 	"time"
 )
 
-// ═══════════════════════════════════════════
-//  Cluster — multi-server management
-// ═══════════════════════════════════════════
-
 type Server struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Host     string `json:"host"`     // IP or hostname
-	Port     int    `json:"port"`     // deploy-stack API port
-	User     string `json:"user"`     // login
-	Pass     string `json:"pass"`     // password
-	Token    string `json:"token,omitempty"` // cached auth token
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Pass     string `json:"pass"`
+	Token    string `json:"token,omitempty"`
 	Online   bool   `json:"online"`
 	LastPing time.Time `json:"last_ping"`
 }
@@ -34,6 +30,7 @@ type ClusterStore struct {
 }
 
 func NewClusterStore(dataDir string) *ClusterStore {
+	os.MkdirAll(dataDir, 0755)
 	cs := &ClusterStore{dataDir: dataDir}
 	cs.load()
 	return cs
@@ -53,14 +50,7 @@ func (cs *ClusterStore) save() {
 }
 
 func (cs *ClusterStore) AddServer(name, host string, port int, user, pass string) Server {
-	s := Server{
-		ID:   genShortID(),
-		Name: name,
-		Host: host,
-		Port: port,
-		User: user,
-		Pass: pass,
-	}
+	s := Server{ID: genShortID(), Name: name, Host: host, Port: port, User: user, Pass: pass}
 	cs.servers = append(cs.servers, s)
 	cs.save()
 	return s
@@ -76,9 +66,7 @@ func (cs *ClusterStore) RemoveServer(id string) {
 	cs.save()
 }
 
-func (cs *ClusterStore) ListServers() []Server {
-	return cs.servers
-}
+func (cs *ClusterStore) ListServers() []Server { return cs.servers }
 
 func (cs *ClusterStore) GetServer(id string) *Server {
 	for i := range cs.servers {
@@ -101,10 +89,6 @@ func (cs *ClusterStore) UpdateToken(id, token string) {
 	cs.save()
 }
 
-// ═══════════════════════════════════════════
-//  Remote API client
-// ═══════════════════════════════════════════
-
 func (cs *ClusterStore) LoginServer(id string) error {
 	s := cs.GetServer(id)
 	if s == nil {
@@ -112,7 +96,8 @@ func (cs *ClusterStore) LoginServer(id string) error {
 	}
 	url := fmt.Sprintf("http://%s:%d/api/v1/login", s.Host, s.Port)
 	body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, s.User, s.Pass)
-	resp, err := http.Post(url, "application/json", strings.NewReader(body))
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Post(url, "application/json", strings.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -152,19 +137,19 @@ func (cs *ClusterStore) CallServer(id, method, path string, body interface{}) ([
 	req.Header.Set("Authorization", "Bearer "+s.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// Re-login on 401
 	if resp.StatusCode == 401 {
 		if err := cs.LoginServer(id); err != nil {
 			return nil, err
 		}
 		req.Header.Set("Authorization", "Bearer "+cs.GetServer(id).Token)
-		resp, err = http.DefaultClient.Do(req)
+		resp, err = client.Do(req)
 		if err != nil {
 			return nil, err
 		}
@@ -214,7 +199,6 @@ func NewCluster(dataDir string) *Cluster {
 	return &Cluster{store: NewClusterStore(dataDir)}
 }
 
-// Cluster handler for API
 func (cl *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -232,9 +216,7 @@ func (cl *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "invalid json", 400)
 			return
 		}
-		if req.Port == 0 {
-			req.Port = 3000
-		}
+		if req.Port == 0 { req.Port = 3000 }
 		s := cl.store.AddServer(req.Name, req.Host, req.Port, req.User, req.Pass)
 		cl.store.LoginServer(s.ID)
 		jsonResp(w, map[string]string{"status": "added", "id": s.ID})
@@ -249,26 +231,84 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	}
 	id := parts[0]
 
-	if len(parts) > 1 && parts[1] == "sites" {
-		data, err := cl.store.CallServer(id, "GET", "/api/v1/sites", nil)
-		if err != nil {
-			jsonErr(w, err.Error(), 502)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
-		return
-	}
+	// Proxy container operations to remote servers
+	if len(parts) >= 2 {
+		action := parts[1]
 
-	if len(parts) > 1 && parts[1] == "runners" {
-		data, err := cl.store.CallServer(id, "GET", "/api/v1/runners", nil)
-		if err != nil {
-			jsonErr(w, err.Error(), 502)
+		// GET /servers/:id/containers
+		if action == "containers" && r.Method == "GET" {
+			data, err := cl.store.CallServer(id, "GET", "/api/v1/containers?show_all=true", nil)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
-		return
+
+		// GET /servers/:id/runners
+		if action == "runners" && r.Method == "GET" {
+			data, err := cl.store.CallServer(id, "GET", "/api/v1/runners", nil)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
+
+		// Proxy /servers/:id/containers/:cname/*
+		if action == "containers" && len(parts) >= 3 {
+			cname := parts[2]
+			rest := ""
+			if len(parts) > 3 {
+				rest = "/" + strings.Join(parts[3:], "/")
+			}
+
+			method := r.Method
+			if method == "GET" && rest == "" {
+				method = "GET"
+			}
+
+			path := "/api/v1/containers/" + cname + rest
+
+			var body interface{}
+			if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+				var b map[string]interface{}
+				if jsonDec(r, &b) == nil {
+					body = b
+				}
+			}
+
+			data, err := cl.store.CallServer(id, method, path, body)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
+
+		// Proxy /servers/:id/runners/:rname/*
+		if action == "runners" && len(parts) >= 3 {
+			rname := parts[2]
+			rest := ""
+			if len(parts) > 3 {
+				rest = "/" + strings.Join(parts[3:], "/")
+			}
+			path := "/api/v1/runners/" + rname + rest
+			data, err := cl.store.CallServer(id, r.Method, path, nil)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
 	}
 
 	if r.Method == "DELETE" {

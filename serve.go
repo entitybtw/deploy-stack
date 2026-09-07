@@ -105,6 +105,7 @@ func startWebServer(port int) {
 	mux.HandleFunc("/api/v1/containers", authReq(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			showAll := r.URL.Query().Get("show_all") == "true"
+			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(listContainers(showAll))
 			return
 		}
@@ -291,6 +292,7 @@ func startWebServer(port int) {
 				"name": name, "status": status, "image": image,
 			})
 		}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(runners)
 	}))
 
@@ -430,7 +432,7 @@ func getContainerPorts(name string) string {
 }
 
 func listContainers(showAll bool) []map[string]interface{} {
-	var containers []map[string]interface{}
+	containers := make([]map[string]interface{}, 0)
 	infra := map[string]bool{
 		"runner": true, "docker_dind": true, "deploy-web": true,
 	}

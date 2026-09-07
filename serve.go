@@ -371,10 +371,14 @@ func listSites() []map[string]interface{} {
 	}
 
 	// Find running containers
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}|{{.Status}}")
-	if out, err := cmd.Output(); err == nil {
+	cmd := exec.CommandContext(ctx, "/bin/docker", "ps", "--format", "{{.Names}}|{{.Status}}")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("docker ps error: %v, output: %s", err, string(out))
+	}
+	if err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			parts := strings.SplitN(line, "|", 2)
 			if len(parts) < 2 { continue }

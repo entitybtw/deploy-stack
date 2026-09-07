@@ -435,50 +435,84 @@ func listContainers(showAll bool) []map[string]interface{} {
 		"runner": true, "docker_dind": true, "deploy-web": true,
 	}
 
+	// Batch: get all container names and statuses
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{.Names}}|{{.Status}}")
+	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.Image}}")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("docker ps error: %v, output: %s", err, string(out))
 		return containers
 	}
 
+	// Batch: get all mounts at once
+	var mountOut []byte
+	mountMap := make(map[string]bool)
+
+	type rawContainer struct {
+		Name   string
+		Status string
+		Image  string
+	}
+
+	var all []rawContainer
 	seen := make(map[string]bool)
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		parts := strings.SplitN(line, "|", 2)
+		parts := strings.SplitN(line, "|", 3)
 		if len(parts) < 1 { continue }
 		name := parts[0]
 		status := ""
+		image := ""
 		if len(parts) > 1 { status = parts[1] }
+		if len(parts) > 2 { image = parts[2] }
 		if seen[name] { continue }
 		seen[name] = true
+		all = append(all, rawContainer{Name: name, Status: status, Image: image})
+	}
 
-		if !showAll && infra[name] { continue }
-		if !showAll && strings.HasPrefix(name, "runner-") && strings.Contains(name, "forgejo") { continue }
-
-		img := getContainerImage(name)
-		ports := getContainerPorts(name)
-
-		info := map[string]interface{}{
-			"name":   name,
-			"status": status,
-			"image":  img,
-			"ports":  ports,
-		}
-
-		// Check if it's a deploy-stack managed container (has /var/www mount)
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+	// Batch mount check: docker inspect all names
+	if !showAll && len(all) > 0 {
+		names := make([]string, len(all))
+		for i, c := range all { names[i] = c.Name }
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel2()
-		mntCmd := exec.CommandContext(ctx2, "docker", "inspect", "-f", "{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}", name)
-		if mntOut, err := mntCmd.Output(); err == nil {
-			mounts := string(mntOut)
+		// Build a format that outputs name|mounts for each
+		inspectCmd := exec.CommandContext(ctx2, "docker", "inspect", "--format", "{{.Name}}|{{range .Mounts}}{{.Source}}:{{.Destination}}|{{end}}")
+		inspectCmd.Args = append(inspectCmd.Args, names...)
+		mountOut, _ = inspectCmd.CombinedOutput()
+		for _, line := range strings.Split(strings.TrimSpace(string(mountOut)), "\n") {
+			parts := strings.SplitN(line, "|", 2)
+			if len(parts) < 2 { continue }
+			name := strings.TrimPrefix(parts[0], "/")
+			mounts := parts[1]
 			if strings.Contains(mounts, "/var/www") {
-				info["managed"] = true
+				mountMap[name] = true
 			}
 		}
+	}
 
-		containers = append(containers, info)
+	for _, c := range all {
+		if !showAll && infra[c.Name] { continue }
+		if !showAll && strings.HasPrefix(c.Name, "runner-") { continue }
+		if !showAll {
+			if _, ok := mountMap[c.Name]; !ok { continue }
+		}
+
+		ports := ""
+		ctx3, cancel3 := context.WithTimeout(context.Background(), 3*time.Second)
+		portCmd := exec.CommandContext(ctx3, "docker", "inspect", "--format",
+			"{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{range $conf}}{{.HostPort}}{{end}} {{end}}", c.Name)
+		portOut, _ := portCmd.CombinedOutput()
+		cancel3()
+		ports = strings.TrimSpace(string(portOut))
+
+		containers = append(containers, map[string]interface{}{
+			"name":    c.Name,
+			"status":  c.Status,
+			"image":   c.Image,
+			"ports":   ports,
+			"managed": mountMap[c.Name],
+		})
 	}
 
 	return containers

@@ -9,8 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -71,6 +69,18 @@ func startWebServer(port int) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "token": token})
 	})
 
+	mux.HandleFunc("/api/v1/logout", func(w http.ResponseWriter, r *http.Request) {
+		token := ""
+		if c, err := r.Cookie("dt"); err == nil {
+			token = c.Value
+		}
+		if token != "" {
+			auth.Logout(token)
+		}
+		http.SetCookie(w, &http.Cookie{Name: "dt", Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
+
 	authReq := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			token := ""
@@ -91,10 +101,132 @@ func startWebServer(port int) {
 		}
 	}
 
-	mux.HandleFunc("/api/v1/sites", authReq(func(w http.ResponseWriter, r *http.Request) {
+	// ── Containers ──
+	mux.HandleFunc("/api/v1/containers", authReq(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			showAll := r.URL.Query().Get("show_all") == "true"
-			json.NewEncoder(w).Encode(listSites(showAll))
+			json.NewEncoder(w).Encode(listContainers(showAll))
+			return
+		}
+	}))
+
+	mux.HandleFunc("/api/v1/containers/", authReq(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/api/v1/containers/")
+		if name == "" {
+			jsonErr(w, "name required", 400)
+			return
+		}
+
+		if strings.HasSuffix(name, "/logs") {
+			name = strings.TrimSuffix(name, "/logs")
+			tail := "200"
+			if t := r.URL.Query().Get("tail"); t != "" { tail = t }
+			w.Header().Set("Content-Type", "text/plain")
+			cmd := exec.Command("docker", "logs", "--tail", tail, name)
+			out, _ := cmd.CombinedOutput()
+			w.Write(out)
+			return
+		}
+
+		if strings.HasSuffix(name, "/exec") && r.Method == "POST" {
+			name = strings.TrimSuffix(name, "/exec")
+			var req struct {
+				Cmd string `json:"cmd"`
+			}
+			jsonDec(r, &req)
+			if req.Cmd == "" {
+				jsonErr(w, "cmd required", 400)
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("X-Accel-Buffering", "no")
+			flusher, ok := w.(http.Flusher)
+			cmd := exec.Command("docker", "exec", name, "sh", "-c", req.Cmd)
+			stdout, _ := cmd.StdoutPipe()
+			stderr, _ := cmd.StderrPipe()
+			if err := cmd.Start(); err != nil {
+				w.Write([]byte("Error: " + err.Error()))
+				return
+			}
+			buf := make([]byte, 4096)
+			go func() {
+				for {
+					n, err := stdout.Read(buf)
+					if n > 0 {
+						w.Write(buf[:n])
+						if ok { flusher.Flush() }
+					}
+					if err != nil { break }
+				}
+			}()
+			go func() {
+				for {
+					n, err := stderr.Read(buf)
+					if n > 0 {
+						w.Write(buf[:n])
+						if ok { flusher.Flush() }
+					}
+					if err != nil { break }
+				}
+			}()
+			cmd.Wait()
+			return
+		}
+
+		if strings.HasSuffix(name, "/inspect") {
+			name = strings.TrimSuffix(name, "/inspect")
+			cmd := exec.Command("docker", "inspect", name)
+			out, _ := cmd.Output()
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(out)
+			return
+		}
+
+		if strings.HasSuffix(name, "/start") {
+			name = strings.TrimSuffix(name, "/start")
+			cmd := exec.Command("docker", "start", name)
+			cmd.Run()
+			jsonResp(w, map[string]string{"status": "started"})
+			return
+		}
+
+		if strings.HasSuffix(name, "/stop") {
+			name = strings.TrimSuffix(name, "/stop")
+			cmd := exec.Command("docker", "stop", name)
+			cmd.Run()
+			jsonResp(w, map[string]string{"status": "stopped"})
+			return
+		}
+
+		if strings.HasSuffix(name, "/restart") {
+			name = strings.TrimSuffix(name, "/restart")
+			cmd := exec.Command("docker", "restart", name)
+			cmd.Run()
+			jsonResp(w, map[string]string{"status": "restarted"})
+			return
+		}
+
+		if strings.HasSuffix(name, "/remove") && r.Method == "DELETE" {
+			name = strings.TrimSuffix(name, "/remove")
+			cmd := exec.Command("docker", "rm", "-f", name)
+			cmd.Run()
+			jsonResp(w, map[string]string{"status": "removed"})
+			return
+		}
+
+		if strings.HasSuffix(name, "/terminal") {
+			name = strings.TrimSuffix(name, "/terminal")
+			http.Error(w, "Use WebSocket for terminal", 400)
+			return
+		}
+
+		jsonErr(w, "unknown action", 404)
+	}))
+
+	// ── Sites (deploy-stack compose-managed) ──
+	mux.HandleFunc("/api/v1/sites", authReq(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			json.NewEncoder(w).Encode(listServices())
 			return
 		}
 		if r.Method == "POST" {
@@ -104,7 +236,7 @@ func startWebServer(port int) {
 				Port int    `json:"port"`
 				Type string `json:"type"`
 			}
-			json.NewDecoder(r.Body).Decode(&req)
+			jsonDec(r, &req)
 			if req.Dir == "" {
 				req.Dir = "/var/www/" + req.Name
 			}
@@ -130,32 +262,6 @@ func startWebServer(port int) {
 
 	mux.HandleFunc("/api/v1/sites/", authReq(func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/api/v1/sites/")
-		if strings.HasSuffix(name, "/logs") {
-			name = strings.TrimSuffix(name, "/logs")
-			w.Header().Set("Content-Type", "text/plain")
-			cmd := exec.Command("docker", "logs", "--tail", "100", name)
-			out, _ := cmd.CombinedOutput()
-			w.Write(out)
-			return
-		}
-		if strings.HasSuffix(name, "/restart") {
-			name = strings.TrimSuffix(name, "/restart")
-			dockerCompose("restart", name)
-			json.NewEncoder(w).Encode(map[string]string{"status": "restarted"})
-			return
-		}
-		if strings.HasSuffix(name, "/stop") {
-			name = strings.TrimSuffix(name, "/stop")
-			dockerCompose("stop", name)
-			json.NewEncoder(w).Encode(map[string]string{"status": "stopped"})
-			return
-		}
-		if strings.HasSuffix(name, "/start") {
-			name = strings.TrimSuffix(name, "/start")
-			dockerCompose("start", name)
-			json.NewEncoder(w).Encode(map[string]string{"status": "started"})
-			return
-		}
 		if strings.HasSuffix(name, "/remove") && r.Method == "DELETE" {
 			name = strings.TrimSuffix(name, "/remove")
 			for _, s := range []string{name, name + "-php"} {
@@ -164,24 +270,21 @@ func startWebServer(port int) {
 			c := readCompose()
 			c = removeService(c, name)
 			writeCompose(c)
-			json.NewEncoder(w).Encode(map[string]string{"status": "removed"})
+			jsonResp(w, map[string]string{"status": "removed"})
 			return
 		}
-		http.NotFound(w, r)
+		jsonErr(w, "unknown", 404)
 	}))
 
+	// ── Runners ──
 	mux.HandleFunc("/api/v1/runners", authReq(func(w http.ResponseWriter, r *http.Request) {
 		names := runnerNames()
 		var runners []map[string]interface{}
 		for _, name := range names {
-			status := "unknown"
-			cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", name)
-			if out, err := cmd.Output(); err == nil {
-				status = strings.TrimSpace(string(out))
-			}
+			status := getContainerStatus(name)
 			image := ""
-			cmd2 := exec.Command("docker", "inspect", "-f", "{{.Config.Image}}", name)
-			if out, err := cmd2.Output(); err == nil {
+			cmd := exec.Command("docker", "inspect", "-f", "{{.Config.Image}}", name)
+			if out, err := cmd.Output(); err == nil {
 				image = strings.TrimSpace(string(out))
 			}
 			runners = append(runners, map[string]interface{}{
@@ -191,11 +294,6 @@ func startWebServer(port int) {
 		json.NewEncoder(w).Encode(runners)
 	}))
 
-	// Cluster management
-	mux.HandleFunc("/api/v1/servers", authReq(cl.handleServers))
-	mux.HandleFunc("/api/v1/servers/", authReq(cl.handleServer))
-
-	// Runner management
 	mux.HandleFunc("/api/v1/runners/add", authReq(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Name     string `json:"name"`
@@ -209,15 +307,11 @@ func startWebServer(port int) {
 			jsonErr(w, "invalid json", 400)
 			return
 		}
-		if req.Capacity == 0 {
-			req.Capacity = 1
-		}
-		if req.Platform == "" {
-			req.Platform = "forgejo"
-		}
+		if req.Capacity == 0 { req.Capacity = 1 }
+		if req.Platform == "" { req.Platform = "forgejo" }
 		addRunner(req.Name, req.Token, req.URL)
 		dockerCompose("up", "-d", req.Name)
-		jsonResp(w, map[string]string{"status": "created", "name": req.Name, "platform": req.Platform})
+		jsonResp(w, map[string]string{"status": "created", "name": req.Name})
 	}))
 
 	mux.HandleFunc("/api/v1/runners/", authReq(func(w http.ResponseWriter, r *http.Request) {
@@ -225,7 +319,7 @@ func startWebServer(port int) {
 		if strings.HasSuffix(name, "/logs") {
 			name = strings.TrimSuffix(name, "/logs")
 			w.Header().Set("Content-Type", "text/plain")
-			cmd := exec.Command("docker", "logs", "--tail", "100", name)
+			cmd := exec.Command("docker", "logs", "--tail", "200", name)
 			out, _ := cmd.CombinedOutput()
 			w.Write(out)
 			return
@@ -251,45 +345,26 @@ func startWebServer(port int) {
 		jsonResp(w, map[string]string{"name": name})
 	}))
 
+	// ── Cluster ──
+	mux.HandleFunc("/api/v1/servers", authReq(cl.handleServers))
+	mux.HandleFunc("/api/v1/servers/", authReq(cl.handleServer))
+
+	// ── Status ──
 	mux.HandleFunc("/api/v1/status", authReq(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"sites":   listSites(false),
-			"runners": runnerNames(),
-			"version": "1.2.0",
+			"containers": len(listContainers(false)),
+			"sites":      listServices(),
+			"runners":    runnerNames(),
+			"version":    "1.3.0",
 		})
 	}))
 
-	mux.HandleFunc("/api/v1/webhook/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "POST required", 405)
-			return
-		}
-		var payload struct {
-			Ref        string `json:"ref"`
-			Repository struct {
-				Name string `json:"name"`
-			} `json:"repository"`
-		}
-		json.NewDecoder(r.Body).Decode(&payload)
-		if payload.Ref != "refs/heads/main" && payload.Ref != "refs/heads/master" {
-			json.NewEncoder(w).Encode(map[string]string{"status": "skipped"})
-			return
-		}
-		sites := listSites(true)
-		for _, s := range sites {
-			if n, ok := s["name"].(string); ok && n == payload.Repository.Name {
-				dockerCompose("up", "-d", "--build", n)
-				json.NewEncoder(w).Encode(map[string]string{"status": "deployed", "site": n})
-				return
-			}
-		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "no matching site"})
-	})
-
+	// ── Docs ──
 	mux.HandleFunc("/api/v1/docs", authReq(func(w http.ResponseWriter, r *http.Request) {
 		serveStaticFile(w, r, "api_docs.html")
 	}))
 
+	// ── Static ──
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
@@ -299,15 +374,13 @@ func startWebServer(port int) {
 	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	log.Printf("deploy-stack v1.2.0 on :%d", port)
+	log.Printf("deploy-stack v1.3.0 on :%d", port)
 	log.Printf("Web:  http://localhost:%d", port)
 	log.Printf("API:  http://localhost:%d/api/v1/", port)
-	log.Printf("Docs: http://localhost:%d/api/v1/docs", port)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
 func serveStaticFile(w http.ResponseWriter, r *http.Request, name string) {
-	// Try multiple paths: next to binary, then /usr/local/share/deploy-stack/static
 	paths := []string{
 		filepath.Join(filepath.Dir(os.Args[0]), "static", name),
 		filepath.Join("/usr/local/share/deploy-stack/static", name),
@@ -328,12 +401,87 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, name string) {
 }
 
 func getContainerStatus(name string) string {
-	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", name)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Status}}", name)
 	out, err := cmd.Output()
 	if err != nil {
 		return "stopped"
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func getContainerImage(name string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.Config.Image}}", name)
+	out, err := cmd.Output()
+	if err != nil { return "" }
+	return strings.TrimSpace(string(out))
+}
+
+func getContainerPorts(name string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{range $conf}}{{.HostPort}}{{end}} {{end}}", name)
+	out, err := cmd.Output()
+	if err != nil { return "" }
+	return strings.TrimSpace(string(out))
+}
+
+func listContainers(showAll bool) []map[string]interface{} {
+	var containers []map[string]interface{}
+	infra := map[string]bool{
+		"runner": true, "docker_dind": true, "deploy-web": true,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{.Names}}|{{.Status}}")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("docker ps error: %v, output: %s", err, string(out))
+		return containers
+	}
+
+	seen := make(map[string]bool)
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) < 1 { continue }
+		name := parts[0]
+		status := ""
+		if len(parts) > 1 { status = parts[1] }
+		if seen[name] { continue }
+		seen[name] = true
+
+		if !showAll && infra[name] { continue }
+		if !showAll && strings.HasPrefix(name, "runner-") && strings.Contains(name, "forgejo") { continue }
+
+		img := getContainerImage(name)
+		ports := getContainerPorts(name)
+
+		info := map[string]interface{}{
+			"name":   name,
+			"status": status,
+			"image":  img,
+			"ports":  ports,
+		}
+
+		// Check if it's a deploy-stack managed container (has /var/www mount)
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel2()
+		mntCmd := exec.CommandContext(ctx2, "docker", "inspect", "-f", "{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}", name)
+		if mntOut, err := mntCmd.Output(); err == nil {
+			mounts := string(mntOut)
+			if strings.Contains(mounts, "/var/www") {
+				info["managed"] = true
+			}
+		}
+
+		containers = append(containers, info)
+	}
+
+	return containers
 }
 
 func jsonResp(w http.ResponseWriter, v interface{}) {
@@ -349,65 +497,4 @@ func jsonErr(w http.ResponseWriter, msg string, code int) {
 
 func jsonDec(r *http.Request, v interface{}) error {
 	return json.NewDecoder(r.Body).Decode(v)
-}
-
-func listSites(showAll bool) []map[string]interface{} {
-	seen := make(map[string]bool)
-	var sites []map[string]interface{}
-
-	// From docker-compose.yml
-	content := readCompose()
-	re := regexp.MustCompile(`(?m)^  (\S+):`)
-	for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
-		name := content[m[2]:m[3]]
-		// Skip infrastructure services and volumes
-		if name == "runner" || strings.HasPrefix(name, "runner-") || 
-		   name == "web" || name == "deploy-web" || name == "deploy-data" { continue }
-		block := content[m[1]:]
-		if next := re.FindStringIndex(block[1:]); next != nil {
-			block = block[:next[0]+1]
-		}
-		port := 0
-		if pm := regexp.MustCompile(`127\.0\.0\.1:(\d+):`).FindStringSubmatch(block); len(pm) > 1 {
-			port, _ = strconv.Atoi(pm[1])
-		}
-		status := getContainerStatus(name)
-		sites = append(sites, map[string]interface{}{
-			"name": name, "port": port, "status": status,
-			"type": "static", "dir": "/var/www/" + name,
-		})
-		seen[name] = true
-	}
-
-	// Find running containers
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "/bin/docker", "ps", "--format", "{{.Names}}|{{.Status}}|{{.Mounts}}")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("docker ps error: %v, output: %s", err, string(out))
-	}
-	if err == nil {
-		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-			parts := strings.SplitN(line, "|", 3)
-			if len(parts) < 2 { continue }
-			name := parts[0]
-			if name == "runner" || strings.HasPrefix(name, "runner-") || 
-			   strings.Contains(name, "docker_dind") || strings.Contains(name, "forgejo") ||
-			   name == "deploy-web" || name == "deploy-data" { continue }
-			if seen[name] { continue }
-			// Filter: only show /var/www containers unless showAll
-			if !showAll {
-				mounts := ""
-				if len(parts) > 2 { mounts = parts[2] }
-				if !strings.Contains(mounts, "/var/www") { continue }
-			}
-			sites = append(sites, map[string]interface{}{
-				"name": name, "port": 0, "status": "running",
-				"type": "docker", "dir": "/var/www/" + name,
-			})
-		}
-	}
-
-	return sites
 }

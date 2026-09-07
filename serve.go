@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Hub struct {
@@ -369,7 +371,9 @@ func listSites() []map[string]interface{} {
 	}
 
 	// Find running containers
-	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}|{{.Status}}")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}|{{.Status}}")
 	if out, err := cmd.Output(); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			parts := strings.SplitN(line, "|", 2)

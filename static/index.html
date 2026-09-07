@@ -12,81 +12,61 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--b0);color:var(--t0);line-height:1.5;font-size:14px}
 .w{max-width:1040px;margin:0 auto;padding:0 16px}
-
 nav{padding:10px 0;border-bottom:1px solid var(--br1)}
 .ni{max-width:1040px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .logo{font-size:1rem;font-weight:700;color:var(--accent);white-space:nowrap}.logo span{color:var(--t2)}
 .nt{display:flex;margin:0 auto}.ntb{padding:6px 14px;font-size:13px;color:var(--t1);cursor:pointer;border-bottom:2px solid transparent;font-weight:500}.ntb:hover{color:var(--t0)}.ntb.a{color:var(--accent);border-bottom-color:var(--accent)}
 .st{display:flex;gap:12px;font-size:12px;color:var(--t2);flex-wrap:wrap;white-space:nowrap}.st b{color:var(--t0)}
-
 .sh{display:flex;align-items:center;gap:10px;margin:20px 0 12px;flex-wrap:wrap}
 .sh-t{font-size:13px;color:var(--t2);font-weight:500}
-
-.c{background:var(--b1);border:1px solid var(--br1);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;transition:border-color .15s;flex-wrap:wrap}.c:hover{border-color:var(--br2)}
-.cn{font-weight:600;font-size:13px;min-width:100px;word-break:break-all}
-.cm{font-family:'SF Mono',Consolas,monospace;font-size:11px;padding:2px 7px;background:var(--ag);color:var(--accent);border:1px solid rgba(122,157,184,.2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
-.cv{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--t1)}
+.c{background:var(--b1);border:1px solid var(--br1);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.c:hover{border-color:var(--br2)}
+.cn{font-weight:600;font-size:13px;min-width:80px}
+.cm{font-family:monospace;font-size:11px;padding:2px 7px;background:var(--ag);color:var(--accent);border:1px solid rgba(122,157,184,.2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.cv{font-family:monospace;font-size:12px;color:var(--t1)}
 .b{font-size:11px;padding:3px 8px;text-align:center;font-weight:500;white-space:nowrap;border:1px solid var(--br2);background:transparent;color:var(--t1);cursor:pointer;display:inline-flex;align-items:center;gap:3px}
 .b:hover{border-color:var(--accent);color:var(--t0)}
-.b-on{background:rgba(119,153,64,.12);color:var(--grn);border-color:rgba(119,153,64,.3)}.b-off{background:rgba(221,119,119,.08);color:var(--red);border-color:rgba(221,119,119,.2)}
-.b-grn{background:rgba(119,153,64,.1);color:var(--grn);border-color:rgba(119,153,64,.25)}
-.b-red{background:rgba(221,119,119,.08);color:var(--red);border-color:rgba(221,119,119,.2)}
-.b-yel{background:rgba(221,215,119,.1);color:var(--yel);border-color:rgba(221,215,119,.25)}
+.b-on{background:rgba(119,153,64,.12);color:#7a9;color:var(--grn,#7a9);border-color:rgba(119,153,64,.3)}
+.b-off{background:rgba(221,119,119,.08);color:var(--red,#d77);border-color:rgba(221,119,119,.2)}
 .b-p{background:var(--accent);color:#fff;border-color:var(--accent)}.b-p:hover{opacity:.9}
-
+.b-y{background:rgba(221,215,119,.1);color:var(--yel,#dd7);border-color:rgba(221,215,119,.25)}
+.b-r{background:rgba(221,119,119,.08);color:var(--red,#d77);border-color:rgba(221,119,119,.2)}
+.b-g{background:rgba(119,153,64,.1);color:var(--grn,#7a9);border-color:rgba(119,153,64,.25)}
 .ca{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
 .emp{text-align:center;padding:30px;color:var(--t2);font-size:13px}
-
 .mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px;cursor:pointer}.mbg.on{display:flex}
-.md{background:var(--b1);border:1px solid var(--br2);padding:20px;width:480px;max-width:100%;cursor:default;max-height:80vh;overflow-y:auto}
+.md{background:var(--b1);border:1px solid var(--br2);padding:20px;width:500px;max-width:100%;cursor:default;max-height:80vh;overflow-y:auto}
 .md h2{font-size:15px;margin-bottom:12px;font-weight:600}
 .fg{margin-bottom:10px}.fg label{display:block;font-size:12px;color:var(--t2);margin-bottom:3px}
-.fg input,.fg select,.fg textarea{width:100%;padding:6px 9px;background:var(--b2);border:1px solid var(--br1);color:var(--t0);font-size:13px;font-family:inherit}.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent)}
-.fg textarea{font-family:'SF Mono',Consolas,monospace;font-size:12px;resize:vertical;min-height:60px}
+.fg input,.fg select,.fg textarea{width:100%;padding:6px 9px;background:var(--b2);border:1px solid var(--br1);color:var(--t0);font-size:13px;font-family:inherit}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent)}
 .fa{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-
 .ab{position:fixed;bottom:16px;right:16px;width:40px;height:40px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:50;border:none;cursor:pointer;font-size:20px}.ab:hover{opacity:.9}
-
-.lbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px;cursor:pointer}.lbg.on{display:flex}
-.lb{background:var(--b1);border:1px solid var(--br2);padding:14px;width:100%;max-width:800px;max-height:75vh;display:flex;flex-direction:column;cursor:default}
-.lb pre{flex:1;overflow:auto;font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--t1);white-space:pre-wrap;word-break:break-all;max-height:60vh}
-
+.lbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:flex-start;justify-content:center;padding:40px 16px;cursor:pointer;overflow-y:auto}.lbg.on{display:flex}
+.lb{background:var(--b1);border:1px solid var(--br2);padding:14px;width:100%;max-width:900px;max-height:80vh;display:flex;flex-direction:column;cursor:default}
+.lb pre{flex:1;overflow:auto;font-family:monospace;font-size:12px;color:var(--t1);white-space:pre-wrap;word-break:break-all;max-height:65vh}
 #lp{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
 .lx{background:var(--b1);border:1px solid var(--br2);padding:24px 28px;width:320px;max-width:100%}
 .lx h1{text-align:center;margin-bottom:14px;font-size:15px}
 .lx .logo{text-align:center;font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.lx .logo span{color:var(--t2)}
-
 .ib{padding:5px;border:1px solid var(--br2);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;color:var(--t1);transition:all .15s}.ib:hover{border-color:var(--accent);color:var(--t0)}
 .ib svg{width:16px;height:16px;fill:currentColor}
-
-.exec-box{background:var(--b2);border:1px solid var(--br1);padding:8px;margin-top:8px;font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--grn)}
-.exec-box .prompt{color:var(--accent)}
-.exec-output{background:#111;color:#ccc;padding:8px;font-family:'SF Mono',Consolas,monospace;font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap;margin-top:4px;display:none;border:1px solid var(--br1)}
+.exec-output{background:#111;color:#ccc;padding:8px;font-family:monospace;font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap;margin-top:8px;display:none;border:1px solid var(--br1)}
 .exec-output.on{display:block}
-
-.cluster-card{background:var(--b1);border:1px solid var(--br1);margin-bottom:8px}
-.cluster-header{padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer}
-.cluster-header:hover{border-color:var(--accent)}
-.cluster-body{display:none;padding:0 12px 12px;border-top:1px solid var(--br1)}
-.cluster-body.open{display:block}
-
 .tag{display:inline-block;font-size:10px;padding:1px 5px;border:1px solid var(--br2);color:var(--t2);margin-left:4px}
-
+.srv-sec{margin-top:14px;padding-top:12px;border-top:1px solid var(--br1)}
+.srv-sec h3{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t1)}
 @media(max-width:600px){.c{flex-direction:column;align-items:flex-start;gap:6px}.ca{margin-left:0;width:100%}.ca .b{flex:1}.nt{overflow-x:auto}.ntb{padding:6px 10px;font-size:12px}.st{display:none}}
 </style>
 </head>
 <body>
-
-<div id="lp">
-  <div class="lx">
-    <div class="logo">deploy<span>-stack</span></div>
-    <h1>Sign In</h1>
-    <div class="fg"><label>Username</label><input id="iU" placeholder="admin" autocomplete="username"></div>
-    <div class="fg"><label>Password</label><input id="iP" type="password" placeholder="password" autocomplete="current-password"></div>
-    <div style="margin-top:16px"><button class="b b-p" style="width:100%;padding:9px;font-size:13px" onclick="doLogin()">Sign In</button></div>
-    <div style="text-align:center;margin-top:10px"><button class="ib" onclick="cycleTheme()"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></button></div>
-  </div>
-</div>
+<div id="lp"><div class="lx">
+  <div class="logo">deploy<span>-stack</span></div><h1>Sign In</h1>
+  <div class="fg"><label>Username</label><input id="iU" placeholder="admin" autocomplete="username"></div>
+  <div class="fg"><label>Password</label><input id="iP" type="password" placeholder="password" autocomplete="current-password"></div>
+  <div style="margin-top:16px"><button class="b b-p" style="width:100%;padding:9px;font-size:13px" onclick="doLogin()">Sign In</button></div>
+  <div style="text-align:center;margin-top:10px"><button class="ib" onclick="cycleTheme()"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></button></div>
+</div></div>
 
 <div id="mp" style="display:none">
   <nav><div class="ni">
@@ -99,39 +79,19 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
     </div>
     <div class="st"><span>Containers: <b id="nC">0</b></span><span>Runners: <b id="nR">0</b></span><span>Servers: <b id="nSR">0</b></span></div>
   </div></nav>
-
   <div class="w">
-    <!-- Containers -->
     <div id="p-containers">
-      <div class="sh">
-        <span class="sh-t">Containers</span>
-        <button class="b" onclick="loadContainers()">Refresh</button>
-      </div>
-      <div id="containers"></div>
-      <div id="ce" class="emp">No containers.</div>
+      <div class="sh"><span class="sh-t">Containers</span><button class="b" onclick="loadContainers()">Refresh</button></div>
+      <div id="containers"></div><div id="ce" class="emp">No containers.</div>
     </div>
-
-    <!-- Cluster -->
     <div id="p-cluster" style="display:none">
-      <div class="sh">
-        <span class="sh-t">Cluster</span>
-        <button class="b" onclick="loadCluster()">Refresh</button>
-      </div>
-      <div id="servers"></div>
-      <div id="sre" class="emp">No servers.</div>
+      <div class="sh"><span class="sh-t">Cluster</span><button class="b" onclick="loadCluster()">Refresh</button></div>
+      <div id="servers"></div><div id="sre" class="emp">No remote servers.</div>
     </div>
-
-    <!-- Runners -->
     <div id="p-runners" style="display:none">
-      <div class="sh">
-        <span class="sh-t">Runners</span>
-        <button class="b" onclick="loadRunners()">Refresh</button>
-      </div>
-      <div id="runners"></div>
-      <div id="re" class="emp">No runners.</div>
+      <div class="sh"><span class="sh-t">Runners</span><button class="b" onclick="loadRunners()">Refresh</button></div>
+      <div id="runners"></div><div id="re" class="emp">No runners.</div>
     </div>
-
-    <!-- Settings -->
     <div id="p-settings" style="display:none">
       <div class="sh"><span class="sh-t">Settings</span></div>
       <div class="c" style="flex-direction:column;align-items:flex-start;gap:10px">
@@ -159,34 +119,31 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
       </div>
     </div>
   </div>
-  <button class="ab" id="addBtn" onclick="addClick()">+</button>
+  <button class="ab" onclick="addClick()">+</button>
 </div>
 
-<!-- Modal: Add Container -->
 <div class="mbg" id="mAdd" onclick="if(event.target===this)hideModal('mAdd')"><div class="md">
-  <h2>Add Container</h2>
+  <h2>Deploy Container</h2>
   <div class="fg"><label>Name</label><input id="fN" placeholder="mysite"></div>
   <div class="fg"><label>Directory</label><input id="fD" placeholder="/var/www/mysite"></div>
   <div class="fg"><label>Port</label><input id="fP" type="number" placeholder="auto"></div>
-  <div class="fg"><label>Type</label><select id="fT"><option value="">auto-detect</option><option value="static">static</option><option value="php">PHP</option><option value="python">Python</option><option value="node">Node.js</option><option value="go">Go</option><option value="rust">Rust</option></select></div>
+  <div class="fg"><label>Type</label><select id="fT"><option value="">auto-detect</option><option value="static">static</option><option value="php">PHP</option><option value="python">Python</option><option value="node">Node.js</option><option value="go">Go</option></select></div>
   <div class="fa"><button class="b" onclick="hideModal('mAdd')">Cancel</button><button class="b b-p" onclick="addSite()">Deploy</button></div>
 </div></div>
 
-<!-- Modal: Add Server -->
 <div class="mbg" id="mSrv" onclick="if(event.target===this)hideModal('mSrv')"><div class="md">
   <h2>Add Server</h2>
   <div class="fg"><label>Name</label><input id="sN" placeholder="prod-1"></div>
-  <div class="fg"><label>Host</label><input id="sH" placeholder="10.0.0.3"></div>
+  <div class="fg"><label>Host (IP)</label><input id="sH" placeholder="10.0.0.103"></div>
   <div class="fg"><label>API Port</label><input id="sP" type="number" value="3000"></div>
   <div class="fg"><label>Login</label><input id="sU" placeholder="admin"></div>
   <div class="fg"><label>Password</label><input id="sW" type="password"></div>
   <div class="fa"><button class="b" onclick="hideModal('mSrv')">Cancel</button><button class="b b-p" onclick="addServer()">Connect</button></div>
 </div></div>
 
-<!-- Modal: Add Runner -->
 <div class="mbg" id="mRun" onclick="if(event.target===this)hideModal('mRun')"><div class="md">
   <h2>Add Runner</h2>
-  <div class="fg"><label>Platform</label><select id="rPlat"><option value="forgejo">Forgejo</option><option value="gitea">Gitea</option><option value="github">GitHub Actions</option><option value="gitlab">GitLab CI</option></select></div>
+  <div class="fg"><label>Platform</label><select id="rPlat"><option value="forgejo">Forgejo</option><option value="gitea">Gitea</option><option value="github">GitHub Actions</option></select></div>
   <div class="fg"><label>Name</label><input id="rN" placeholder="runner-1"></div>
   <div class="fg"><label>URL</label><input id="rU" placeholder="https://forgejo.example.com"></div>
   <div class="fg"><label>Token</label><input id="rT" placeholder="registration token"></div>
@@ -195,15 +152,13 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
   <div class="fa"><button class="b" onclick="hideModal('mRun')">Cancel</button><button class="b b-p" onclick="addRunner()">Create</button></div>
 </div></div>
 
-<!-- Modal: Exec -->
 <div class="mbg" id="mExec" onclick="if(event.target===this)hideModal('mExec')"><div class="md">
-  <h2>Execute: <span id="execName"></span></h2>
+  <h2>Exec: <span id="execName"></span></h2>
   <div class="fg"><label>Command</label><input id="execCmd" placeholder="ls -la" onkeydown="if(event.key==='Enter')runExec()"></div>
   <div class="fa"><button class="b" onclick="hideModal('mExec')">Close</button><button class="b b-p" onclick="runExec()">Run</button></div>
   <div class="exec-output" id="execOut"></div>
 </div></div>
 
-<!-- Modal: Logs -->
 <div class="lbg" id="mLog" onclick="if(event.target===this)hideModal('mLog')"><div class="lb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <span style="font-weight:600;font-size:13px" id="logTitle">Logs</span>
@@ -212,7 +167,6 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
   <pre id="lb"></pre>
 </div></div>
 
-<!-- Modal: Inspect -->
 <div class="lbg" id="mInspect" onclick="if(event.target===this)hideModal('mInspect')"><div class="lb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <span style="font-weight:600;font-size:13px">Inspect</span>
@@ -221,33 +175,34 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
   <pre id="ib"></pre>
 </div></div>
 
-<!-- Modal: Cluster Server Detail -->
 <div class="lbg" id="mSrvDetail" onclick="if(event.target===this)hideModal('mSrvDetail')"><div class="lb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span style="font-weight:600;font-size:13px" id="srvDetailTitle">Server</span>
-    <button class="b" onclick="hideModal('mSrvDetail')">Close</button>
+    <span style="font-weight:600;font-size:15px" id="srvTitle">Server</span>
+    <div style="display:flex;gap:6px"><button class="b" onclick="srvRefresh()">Refresh</button><button class="b" onclick="hideModal('mSrvDetail')">Close</button></div>
   </div>
-  <div id="srvDetailBody" style="flex:1;overflow:auto"></div>
+  <div id="srvBody" style="flex:1;overflow:auto"></div>
 </div></div>
 
 <script>
 var ACCENTS=['#7a9db8','#d4a574','#e6a23c','#e15b64','#b56576','#5aa7a7','#6ba76b','#8a7ad4','#c475d4','#333333'];
-function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c}).join('');var n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255]}
+function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255]}
 function hexAlpha(hex,a){var r=hexToRgb(hex);return'rgba('+r[0]+','+r[1]+','+r[2]+','+a+')'}
-function applyAccent(hex){hex=hex.trim();if(!/^#[0-9a-f]{3,6}$/i.test(hex))return;document.documentElement.style.setProperty('--accent',hex);document.documentElement.style.setProperty('--ag',hexAlpha(hex,.1));localStorage.setItem('ds-accent',hex);$('acPick').value=hex;$('acHex').value=hex;renderAccentPresets()}
+function applyAccent(hex){hex=hex.trim();if(!/^#[0-9a-fA-F]{3,8}$/.test(hex))return;document.documentElement.style.setProperty('--accent',hex);document.documentElement.style.setProperty('--ag',hexAlpha(hex,.1));localStorage.setItem('ds-accent',hex);$('acPick').value=hex;$('acHex').value=hex;renderAccentPresets()}
 function initAccent(){applyAccent(localStorage.getItem('ds-accent')||'#7a9db8')}
-function renderAccentPresets(){$('acPresets').innerHTML=ACCENTS.map(function(c){var sel=localStorage.getItem('ds-accent')===c;return'<button onclick="applyAccent(\''+c+'\')" style="width:28px;height:28px;background:'+c+';border:2px solid '+(sel?'var(--t0)':'transparent')+';cursor:pointer"></button>'}).join('')}
-var IS='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1z"/></svg>';
-var IM='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>';
+function renderAccentPresets(){$('acPresets').innerHTML=ACCENTS.map(function(c){return'<button onclick="applyAccent(\''+c+'\')" style="width:28px;height:28px;background:'+c+';border:2px solid '+(localStorage.getItem('ds-accent')===c?'var(--t0)':'transparent')+';cursor:pointer"></button>'}).join('')}
 function setTheme(t){document.documentElement.dataset.theme=t;localStorage.setItem('ds-t',t)}
 function cycleTheme(){var cs=['dark','light','black'],c=document.documentElement.dataset.theme||'dark';setTheme(cs[(cs.indexOf(c)+1)%cs.length])}
 initAccent();setTheme(localStorage.getItem('ds-t')||'dark');
 
 var T=localStorage.getItem('ds-tk')||'';
-function api(m,p,b){var o={method:m,headers:{'Content-Type':'application/json'}};if(T)o.headers.Authorization='Bearer '+T;if(b)o.body=JSON.stringify(b);return fetch(p,o).then(function(r){if(r.status===401){showLogin();throw new Error('unauthorized')}return r.json()})}
-function apiText(m,p){return fetch(p,{method:m,headers:T?{Authorization:'Bearer '+T}:{}}).then(function(r){return r.text()})}
-
-function doLogin(){fetch('/api/v1/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('iU').value,password:$('iP').value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem('ds-tk',T);showMain()}else alert(d.error||'Error')}).catch(function(){alert('Error')})}
+function api(method,url,body){
+  var opts={method:method,headers:{}};
+  if(method!=='GET')opts.headers['Content-Type']='application/json';
+  if(T)opts.headers['Authorization']='Bearer '+T;
+  if(body)opts.body=JSON.stringify(body);
+  return fetch(url,opts).then(function(r){if(r.status===401){showLogin();throw new Error('401')}if(!r.ok)return r.json().then(function(d){throw new Error(d.error||r.status)});var ct=r.headers.get('content-type')||'';if(ct.indexOf('json')>=0)return r.json();return r.text()});
+}
+function doLogin(){fetch('/api/v1/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('iU').value,password:$('iP').value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem('ds-tk',T);showMain()}else alert(d.error||'Error')}).catch(function(){alert('Connection error')})}
 function showLogin(){$('lp').style.display='flex';$('mp').style.display='none'}
 function showMain(){$('lp').style.display='none';$('mp').style.display='block';loadAll();initShowAll()}
 
@@ -258,120 +213,79 @@ function loadAll(){loadContainers();loadCluster();loadRunners()}
 function initShowAll(){$('showAll').checked=localStorage.getItem('ds-showall')==='1'}
 function toggleShowAll(){localStorage.setItem('ds-showall',$('showAll').checked?'1':'0');loadContainers()}
 
+function statusBadge(s){var up=s&&(s.indexOf('Up')>=0||s==='running');return'<div class="b '+(up?'b-on':'b-off')+'">'+e(s?s.split(' ')[0]:'?')+'</div>'}
+function e(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function $(id){return document.getElementById(id)}
+function showModal(id){$(id).classList.add('on')}
+function hideModal(id){$(id).classList.remove('on')}
+function esc(s){return encodeURIComponent(s)}
+
 /* ── Containers ── */
 function loadContainers(){
   var showAll=localStorage.getItem('ds-showall')==='1';
   api('GET','/api/v1/containers?show_all='+showAll).then(function(s){
     s=s||[];$('nC').textContent=s.length;$('ce').style.display=s.length?'none':'block';
     $('containers').innerHTML=s.map(function(x){
-      var st=x.status||'?';
-      var isUp=st.indexOf('Up')>=0||st==='running';
-      var stCls=isUp?'b-on':'b-off';
-      var mgd=x.managed?'<span class="tag">managed</span>':'';
-      var portStr=x.ports?'<div class="cv">'+esc(x.ports)+'</div>':'';
-      return'<div class="c" style="border-left:3px solid '+(isUp?'var(--grn)':'var(--red)')+'"><div class="cn">'+esc(x.name)+mgd+'</div><div class="cm" title="'+esc(x.image)+'">'+esc(x.image)+'</div>'+portStr+'<div class="b '+stCls+'">'+esc(st.split(' ')[0])+'</div><div class="ca"><button class="b" onclick="showExec(\''+esc(x.name)+'\')" title="Execute command">exec</button><button class="b" onclick="showLogs(\''+esc(x.name)+'\')" title="Logs">logs</button><button class="b" onclick="inspectContainer(\''+esc(x.name)+'\')" title="Inspect">info</button>'+(isUp?'<button class="b b-yel" onclick="restartContainer(\''+esc(x.name)+'\')" title="Restart">restart</button><button class="b b-red" onclick="stopContainer(\''+esc(x.name)+'\')" title="Stop">stop</button>':'<button class="b b-grn" onclick="startContainer(\''+esc(x.name)+'\')" title="Start">start</button>')+'<button class="b b-red" onclick="removeContainer(\''+esc(x.name)+'\')" title="Remove">rm</button></div></div>'
+      var st=x.status||'?';var up=st.indexOf('Up')>=0;
+      var tags=x.managed?'<span class="tag">managed</span>':'';
+      var portStr=x.ports?'<div class="cv">'+e(x.ports)+'</div>':'';
+      var n=esc(x.name);
+      return'<div class="c" style="border-left:3px solid '+(up?'#7a9':'#d77')+'"><div class="cn">'+e(x.name)+tags+'</div><div class="cm" title="'+e(x.image)+'">'+e(x.image)+'</div>'+portStr+statusBadge(st)+'<div class="ca"><button class="b" onclick="doExec(\''+n+'\')">exec</button><button class="b" onclick="doLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doInspect(\''+n+'\',\''+e(x.name)+'\')">info</button>'+(up?'<button class="b b-y" onclick="doAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doAction(\''+n+'\',\'stop\')">stop</button>':'<button class="b b-g" onclick="doAction(\''+n+'\',\'start\')">start</button>')+'<button class="b b-r" onclick="doRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>';
     }).join('');
-  }).catch(function(e){console.error(e)})
+  }).catch(function(er){$('containers').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
-function showLogs(n){$('logTitle').textContent='Logs: '+n;apiText('GET','/api/v1/containers/'+encodeURIComponent(n)+'/logs?tail=500').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
-function inspectContainer(n){apiText('GET','/api/v1/containers/'+encodeURIComponent(n)+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(e){}$('ib').textContent=t;$('mInspect').classList.add('on')})}
-function startContainer(n){api('POST','/api/v1/containers/'+encodeURIComponent(n)+'/start').then(function(){setTimeout(loadContainers,1000)})}
-function stopContainer(n){api('POST','/api/v1/containers/'+encodeURIComponent(n)+'/stop').then(function(){setTimeout(loadContainers,1000)})}
-function restartContainer(n){api('POST','/api/v1/containers/'+encodeURIComponent(n)+'/restart').then(function(){setTimeout(loadContainers,1000)})}
-function removeContainer(n){if(!confirm('Remove '+n+'?'))return;api('DELETE','/api/v1/containers/'+encodeURIComponent(n)+'/remove').then(function(){setTimeout(loadContainers,1000)})}
-
-function showExec(n){$('execName').textContent=n;$('execCmd').value='';$('execOut').textContent='';$('execOut').classList.remove('on');showModal('mExec');setTimeout(function(){$('execCmd').focus()},100)}
-function runExec(){
-  var n=$('execName').textContent,cmd=$('execCmd').value;
-  if(!cmd)return;
-  var out=$('execOut');out.classList.add('on');out.textContent='Running: '+cmd+'\n';
-  fetch('/api/v1/containers/'+encodeURIComponent(n)+'/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({cmd:cmd})}).then(function(r){return r.text()}).then(function(t){out.textContent+=t}).catch(function(e){out.textContent+='Error: '+e})
-}
-function addSite(){var n=$('fN').value;if(!n)return alert('Name required');api('POST','/api/v1/sites',{name:n,dir:$('fD').value||'/var/www/'+n,port:parseInt($('fP').value)||0,type:$('fT').value}).then(function(){hideModal('mAdd');setTimeout(loadContainers,3000)}).catch(function(e){alert(e)})}
+function doLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/containers/'+n+'/logs?tail=500').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
+function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')})}
+function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){setTimeout(loadContainers,1000)})}
+function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){setTimeout(loadContainers,1000)})}
+function doExec(n){$('execName').textContent=unescape(decodeURIComponent(n));$('execCmd').value='';$('execOut').textContent='';$('execOut').classList.remove('on');showModal('mExec');setTimeout(function(){$('execCmd').focus()},100)}
+function runExec(){var n=esc($('execName').textContent),cmd=$('execCmd').value;if(!cmd)return;var out=$('execOut');out.classList.add('on');out.textContent='Running: '+cmd+'\n';fetch('/api/v1/containers/'+n+'/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({cmd:cmd})}).then(function(r){return r.text()}).then(function(t){out.textContent+=t}).catch(function(er){out.textContent+='Error: '+er})}
+function addSite(){var n=$('fN').value;if(!n)return alert('Name required');api('POST','/api/v1/sites',{name:n,dir:$('fD').value||'/var/www/'+n,port:parseInt($('fP').value)||0,type:$('fT').value}).then(function(){hideModal('mAdd');setTimeout(loadContainers,3000)}).catch(function(er){alert(e(String(er)))})}
 
 /* ── Cluster ── */
-function loadCluster(){api('GET','/api/v1/servers').then(function(s){s=s||[];$('nSR').textContent=s.length;$('sre').style.display=s.length?'none':'block';$('servers').innerHTML=s.map(function(x){var cls=x.online?'b-on':'b-off';return'<div class="c"><div class="cn">'+esc(x.name)+'</div><div class="cm">'+esc(x.host)+':'+x.port+'</div><div class="b '+cls+'">'+(x.online?'online':'offline')+'</div><div class="ca"><button class="b" onclick="openServerDetail(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">manage</button><button class="b b-red" onclick="rmServer(\''+esc(x.id)+'\')">remove</button></div></div>'}).join('')}).catch(function(){})}
+var curSrvId='',curSrvName='';
+function loadCluster(){api('GET','/api/v1/servers').then(function(s){s=s||[];$('nSR').textContent=s.length;$('sre').style.display=s.length?'none':'block';$('servers').innerHTML=s.map(function(x){return'<div class="c"><div class="cn">'+e(x.name)+'</div><div class="cm">'+e(x.host)+':'+x.port+'</div>'+statusBadge(x.online?'online':'offline')+'<div class="ca"><button class="b" onclick="openSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">manage</button><button class="b b-r" onclick="rmSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">remove</button></div></div>'}).join('')}).catch(function(){})}
 function addServer(){var n=$('sN').value,h=$('sH').value;if(!n||!h)return alert('Name and host required');api('POST','/api/v1/servers',{name:n,host:h,port:parseInt($('sP').value)||3000,user:$('sU').value,pass:$('sW').value}).then(function(){hideModal('mSrv');setTimeout(loadCluster,1000)})}
-function rmServer(id){if(!confirm('Remove server?'))return;api('DELETE','/api/v1/servers/'+id).then(function(){loadCluster()})}
+function rmSrv(id,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id).then(function(){loadCluster()})}
 
-function openServerDetail(id,name){
-  $('srvDetailTitle').textContent=name;
-  $('srvDetailBody').innerHTML='<div style="padding:10px;color:var(--t2)">Loading...</div>';
-  showModal('mSrvDetail');
-
+function openSrv(id,name){curSrvId=id;curSrvName=name;$('srvTitle').textContent=name;$('srvBody').innerHTML='<div style="padding:20px;color:var(--t2)">Loading...</div>';showModal('mSrvDetail');srvRefresh()}
+function srvRefresh(){
+  var id=curSrvId;if(!id)return;
+  $('srvBody').innerHTML='<div style="padding:20px;color:var(--t2)">Loading...</div>';
   Promise.all([
-    apiText('GET','/api/v1/servers/'+id+'/containers'),
-    apiText('GET','/api/v1/servers/'+id+'/runners')
-  ]).then(function(results){
-    var containers=[],runners=[];
-    try{containers=JSON.parse(results[0])}catch(e){}
-    try{runners=JSON.parse(results[1])}catch(e){}
-
-    var h='<div style="margin-bottom:10px;font-weight:600;font-size:13px">Containers ('+containers.length+')</div>';
-    containers.forEach(function(c){
-      var isUp=(c.status||'').indexOf('Up')>=0;
-      h+='<div class="c" style="margin:0 0 4px"><div class="cn">'+esc(c.name)+'</div><div class="b '+(isUp?'b-on':'b-off')+'">'+esc((c.status||'?').split(' ')[0])+'</div><div class="ca">';
-      h+='<button class="b" onclick="remoteExec(\''+esc(id)+'\',\''+esc(c.name)+'\')">exec</button>';
-      h+='<button class="b" onclick="remoteLogs(\''+esc(id)+'\',\''+esc(c.name)+'\')">logs</button>';
-      if(isUp){
-        h+='<button class="b b-yel" onclick="remoteAction(\''+esc(id)+'\',\''+esc(c.name)+'\',\'restart\')">restart</button>';
-        h+='<button class="b b-red" onclick="remoteAction(\''+esc(id)+'\',\''+esc(c.name)+'\',\'stop\')">stop</button>';
-      } else {
-        h+='<button class="b b-grn" onclick="remoteAction(\''+esc(id)+'\',\''+esc(c.name)+'\',\'start\')">start</button>';
-      }
+    api('GET','/api/v1/servers/'+id+'/containers').catch(function(){return[]}),
+    api('GET','/api/v1/servers/'+id+'/runners').catch(function(){return[]})
+  ]).then(function(r){
+    var cc=r[0]||[];var rr=r[1]||[];
+    var h='<div class="srv-sec" style="margin-top:0;border-top:none"><h3>Containers ('+cc.length+')</h3></div>';
+    cc.forEach(function(c){
+      var up=(c.status||'').indexOf('Up')>=0;var n=esc(c.name);var si=esc(id);
+      h+='<div class="c" style="margin:0 0 4px"><div class="cn">'+e(c.name)+'</div>'+statusBadge(c.status||'?')+'<div class="ca">';
+      h+='<button class="b" onclick="srvExec(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">exec</button>';
+      h+='<button class="b" onclick="srvLogs(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">logs</button>';
+      if(up){h+='<button class="b b-y" onclick="srvAction(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvAction(\''+si+'\',\''+n+'\',\'stop\')">stop</button>';}
+      else{h+='<button class="b b-g" onclick="srvAction(\''+si+'\',\''+n+'\',\'start\')">start</button>';}
       h+='</div></div>';
     });
-
-    h+='<div style="margin:14px 0 10px;font-weight:600;font-size:13px">Runners ('+runners.length+')</div>';
-    runners.forEach(function(r){
-      var isUp=(r.status||'').indexOf('Up')>=0;
-      h+='<div class="c" style="margin:0 0 4px"><div class="cn">'+esc(r.name)+'</div><div class="b '+(isUp?'b-on':'b-off')+'">'+esc((r.status||'?').split(' ')[0])+'</div></div>';
+    if(!cc.length)h+='<div class="emp">No containers (server may be offline)</div>';
+    h+='<div class="srv-sec"><h3>Runners ('+rr.length+')</h3></div>';
+    rr.forEach(function(r){
+      var up=(r.status||'').indexOf('Up')>=0;
+      h+='<div class="c" style="margin:0 0 4px"><div class="cn">'+e(r.name)+'</div>'+statusBadge(r.status||'?')+'</div>';
     });
-
-    if(!containers.length&&!runners.length)h+='<div class="emp">No data. Server may be offline.</div>';
-    $('srvDetailBody').innerHTML=h;
-  }).catch(function(e){
-    $('srvDetailBody').innerHTML='<div class="emp">Error: '+esc(String(e))+'</div>';
-  });
+    $('srvBody').innerHTML=h;
+  }).catch(function(er){$('srvBody').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
-
-function remoteExec(id,cname){
-  var cmd=prompt('Command for '+cname+':');
-  if(!cmd)return;
-  api('POST','/api/v1/servers/'+id+'/containers/'+encodeURIComponent(cname)+'/exec',{cmd:cmd}).then(function(r){
-    $('lb').textContent=typeof r==='string'?r:JSON.stringify(r,null,2);
-    $('logTitle').textContent='Result: '+cname;
-    $('mLog').classList.add('on');
-  }).catch(function(e){alert('Error: '+e)})
-}
-function remoteLogs(id,cname){
-  apiText('GET','/api/v1/servers/'+id+'/containers/'+encodeURIComponent(cname)+'/logs').then(function(t){
-    $('lb').textContent=t;
-    $('logTitle').textContent='Logs: '+cname;
-    $('mLog').classList.add('on');
-  }).catch(function(e){$('lb').textContent='Error: '+e})
-}
-function remoteAction(id,cname,action){
-  api('POST','/api/v1/servers/'+id+'/containers/'+encodeURIComponent(cname)+'/'+action).then(function(){
-    setTimeout(function(){openServerDetail(id,$('srvDetailTitle').textContent)},1000)
-  })
-}
+function srvExec(id,cn,name){var cmd=prompt('Command for '+name+':');if(!cmd)return;api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/exec',{cmd:cmd}).then(function(r){$('lb').textContent=typeof r==='string'?r:JSON.stringify(r,null,2);$('logTitle').textContent='Result: '+name;$('mLog').classList.add('on')}).catch(function(er){alert('Error: '+er)})}
+function srvLogs(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/logs?tail=200').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
+function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){setTimeout(srvRefresh,1000)})}
 
 /* ── Runners ── */
-function loadRunners(){api('GET','/api/v1/runners').then(function(r){r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';$('runners').innerHTML=r.map(function(x){var isUp=(x.status||'').indexOf('Up')>=0;return'<div class="c"><div class="cn">'+esc(x.name)+'</div><div class="cm">'+esc(x.image||'')+'</div><div class="b '+(isUp?'b-on':'b-off')+'">'+esc(x.status)+'</div><div class="ca"><button class="b" onclick="showRunnerLogs(\''+esc(x.name)+'\')">logs</button><button class="b" onclick="restartRunner(\''+esc(x.name)+'\')">restart</button><button class="b b-red" onclick="stopRunner(\''+esc(x.name)+'\')">stop</button><button class="b b-red" onclick="rmRunner(\''+esc(x.name)+'\')">rm</button></div></div>'}).join('')}).catch(function(){})}
+function loadRunners(){api('GET','/api/v1/runners').then(function(r){r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';$('runners').innerHTML=r.map(function(x){var up=(x.status||'').indexOf('Up')>=0;var n=esc(x.name);return'<div class="c"><div class="cn">'+e(x.name)+'</div><div class="cm">'+e(x.image||'')+'</div>'+statusBadge(x.status||'?')+'<div class="ca"><button class="b" onclick="doRunnerLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doRunnerAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doRunnerAction(\''+n+'\',\'stop\')">stop</button><button class="b b-r" onclick="doRunnerRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>'}).join('')}).catch(function(){})}
 function addRunner(){var n=$('rN').value,u=$('rU').value,t=$('rT').value;if(!n||!u||!t)return alert('Fill all fields');api('POST','/api/v1/runners/add',{name:n,url:u,token:t,labels:$('rL').value,capacity:parseInt($('rCap').value)||1,platform:$('rPlat').value}).then(function(){hideModal('mRun');setTimeout(loadRunners,2000)})}
-function rmRunner(n){if(!confirm('Remove '+n+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){setTimeout(loadRunners,1000)})}
-function restartRunner(n){api('POST','/api/v1/runners/'+n+'/restart').then(function(){setTimeout(loadRunners,2000)})}
-function stopRunner(n){api('POST','/api/v1/runners/'+n+'/stop').then(function(){setTimeout(loadRunners,2000)})}
-function showRunnerLogs(n){$('logTitle').textContent='Logs: '+n;apiText('GET','/api/v1/runners/'+n+'/logs').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
-
-function $(id){return document.getElementById(id)}
-function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
-function showModal(id){$(id).classList.add('on')}
-function hideModal(id){$(id).classList.remove('on')}
-
-renderAccentPresets();
-if(T)api('GET','/api/v1/status').then(function(){showMain()}).catch(function(){showLogin()});else showLogin();
+function doRunnerRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){setTimeout(loadRunners,1000)})}
+function doRunnerAction(n,a){api('POST','/api/v1/runners/'+n+'/'+a).then(function(){setTimeout(loadRunners,2000)})}
+function doRunnerLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/runners/'+n+'/logs').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
 </script>
 </body>
 </html>

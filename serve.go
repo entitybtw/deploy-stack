@@ -349,9 +349,9 @@ func listSites() []map[string]interface{} {
 	re := regexp.MustCompile(`(?m)^  (\S+):`)
 	for _, m := range re.FindAllStringSubmatchIndex(content, -1) {
 		name := content[m[2]:m[3]]
-		if name == "runner" || strings.HasPrefix(name, "runner-") {
-			continue
-		}
+		// Skip infrastructure services and volumes
+		if name == "runner" || strings.HasPrefix(name, "runner-") || 
+		   name == "web" || name == "deploy-web" || name == "deploy-data" { continue }
 		block := content[m[1]:]
 		if next := re.FindStringIndex(block[1:]); next != nil {
 			block = block[:next[0]+1]

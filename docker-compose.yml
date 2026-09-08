@@ -16,6 +16,7 @@ services:
   runner:
     image: data.forgejo.org/forgejo/runner:4.0.0
     container_name: runner
+    user: root
     restart: unless-stopped
     volumes:
       - /root/forgejo-runner/data:/data

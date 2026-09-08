@@ -250,7 +250,7 @@ func startWebServer(port int) {
 			}
 			c := readCompose()
 			c = removeService(c, req.Name)
-			c = strings.TrimRight(c, "\n") + "\n" + buildServiceBlock(req.Name, req.Dir, req.Port, lang)
+			c = insertService(c, buildServiceBlock(req.Name, req.Dir, req.Port, lang))
 			writeCompose(c)
 			svc := req.Name
 			if lang.Name == "php" {
@@ -381,7 +381,7 @@ func startWebServer(port int) {
 				jsonErr(w, "invalid json", 400)
 				return
 			}
-			// Update .runner file labels
+			// Update .runner file labels - preserve all other fields
 			runnerFile := "/root/forgejo-runner/data/.runner"
 			if name != "runner" {
 				runnerFile = "/root/forgejo-runner/data/" + name + "/.runner"
@@ -391,14 +391,14 @@ func startWebServer(port int) {
 				jsonErr(w, "runner config not found", 404)
 				return
 			}
-			var rf struct {
-				Labels []string `json:"labels"`
-			}
+			var rf map[string]interface{}
 			json.Unmarshal(data, &rf)
-			rf.Labels = strings.Split(req.Labels, ",")
-			for i := range rf.Labels {
-				rf.Labels[i] = strings.TrimSpace(rf.Labels[i])
+			rf["labels"] = strings.Split(req.Labels, ",")
+			labels := rf["labels"].([]string)
+			for i := range labels {
+				labels[i] = strings.TrimSpace(labels[i])
 			}
+			rf["labels"] = labels
 			newData, _ := json.MarshalIndent(rf, "", "  ")
 			os.WriteFile(runnerFile, newData, 0644)
 			// Restart runner to apply

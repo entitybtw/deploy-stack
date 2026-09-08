@@ -159,6 +159,13 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
   <div class="exec-output" id="execOut"></div>
 </div></div>
 
+<div class="mbg" id="mEditRunner" onclick="if(event.target===this)hideModal('mEditRunner')"><div class="md">
+  <h2>Edit Runner: <span id="erName"></span></h2>
+  <input type="hidden" id="erN">
+  <div class="fg"><label>Labels (comma-separated, e.g. my-site:host)</label><input id="erL" placeholder="webserver:host"></div>
+  <div class="fa"><button class="b" onclick="hideModal('mEditRunner')">Cancel</button><button class="b b-p" onclick="saveRunnerEdit()">Save & Restart</button></div>
+</div></div>
+
 <div class="lbg" id="mLog" onclick="if(event.target===this)hideModal('mLog')"><div class="lb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <span style="font-weight:600;font-size:13px" id="logTitle">Logs</span>
@@ -281,11 +288,13 @@ function srvLogs(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'
 function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){setTimeout(srvRefresh,1000)})}
 
 /* ── Runners ── */
-function loadRunners(){api('GET','/api/v1/runners').then(function(r){r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';$('runners').innerHTML=r.map(function(x){var up=(x.status||'').indexOf('Up')>=0;var n=esc(x.name);return'<div class="c"><div class="cn">'+e(x.name)+'</div><div class="cm">'+e(x.image||'')+'</div>'+statusBadge(x.status||'?')+'<div class="ca"><button class="b" onclick="doRunnerLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doRunnerAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doRunnerAction(\''+n+'\',\'stop\')">stop</button><button class="b b-r" onclick="doRunnerRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>'}).join('')}).catch(function(){})}
+function loadRunners(){api('GET','/api/v1/runners').then(function(r){r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';$('runners').innerHTML=r.map(function(x){var up=(x.status||'').indexOf('Up')>=0;var n=esc(x.name);var lbl=x.labels?e(x.labels):'';return'<div class="c"><div class="cn">'+e(x.name)+'</div><div class="cm" title="'+lbl+'">'+lbl+'</div><div class="cm">'+e(x.image||'')+'</div>'+statusBadge(x.status||'?')+'<div class="ca"><button class="b" onclick="doRunnerLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="editRunner(\''+n+'\',\''+e(x.name)+'\',\''+lbl+'\')">edit</button><button class="b" onclick="doRunnerAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doRunnerAction(\''+n+'\',\'stop\')">stop</button><button class="b b-r" onclick="doRunnerRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>'}).join('')}).catch(function(){})}
 function addRunner(){var n=$('rN').value,u=$('rU').value,t=$('rT').value;if(!n||!u||!t)return alert('Fill all fields');api('POST','/api/v1/runners/add',{name:n,url:u,token:t,labels:$('rL').value,capacity:parseInt($('rCap').value)||1,platform:$('rPlat').value}).then(function(){hideModal('mRun');setTimeout(loadRunners,2000)})}
 function doRunnerRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){setTimeout(loadRunners,1000)})}
 function doRunnerAction(n,a){api('POST','/api/v1/runners/'+n+'/'+a).then(function(){setTimeout(loadRunners,2000)})}
 function doRunnerLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/runners/'+n+'/logs').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
+function editRunner(n,name,labels){$('erName').textContent=name;$('erN').value=n;$('erL').value=labels;showModal('mEditRunner')}
+function saveRunnerEdit(){var n=$('erN').value,labels=$('erL').value;api('POST','/api/v1/runners/'+esc(n)+'/edit',{labels:labels}).then(function(){hideModal('mEditRunner');setTimeout(loadRunners,2000)}).catch(function(er){alert('Error: '+er)})}
 </script>
 </body>
 </html>

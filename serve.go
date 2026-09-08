@@ -279,21 +279,46 @@ func startWebServer(port int) {
 
 	// ── Runners ──
 	mux.HandleFunc("/api/v1/runners", authReq(func(w http.ResponseWriter, r *http.Request) {
-		names := runnerNames()
-		var runners []map[string]interface{}
-		for _, name := range names {
-			status := getContainerStatus(name)
-			image := ""
-			cmd := exec.Command("docker", "inspect", "-f", "{{.Config.Image}}", name)
-			if out, err := cmd.Output(); err == nil {
-				image = strings.TrimSpace(string(out))
+		if r.Method == "GET" {
+			names := runnerNames()
+			var runners []map[string]interface{}
+			for _, name := range names {
+				status := getContainerStatus(name)
+				image := ""
+				cmd := exec.Command("docker", "inspect", "-f", "{{.Config.Image}}", name)
+				if out, err := cmd.Output(); err == nil {
+					image = strings.TrimSpace(string(out))
+				}
+				// Read labels from config.yaml
+				labels := ""
+				configPath := filepath.Join(stackDir(), "docker-compose.yml")
+				if data, err := os.ReadFile(configPath); err == nil {
+					// Try to find runner labels in config
+					content := string(data)
+					_ = content
+				}
+				// Read from .runner file for labels
+				runnerFile := "/root/forgejo-runner/data/.runner"
+				if name != "runner" {
+					runnerFile = "/root/forgejo-runner/data/" + name + "/.runner"
+				}
+				if data, err := os.ReadFile(runnerFile); err == nil {
+					var rf struct {
+						Labels []string `json:"labels"`
+						Name   string   `json:"name"`
+					}
+					if json.Unmarshal(data, &rf) == nil && len(rf.Labels) > 0 {
+						labels = strings.Join(rf.Labels, ", ")
+					}
+				}
+				runners = append(runners, map[string]interface{}{
+					"name": name, "status": status, "image": image, "labels": labels,
+				})
 			}
-			runners = append(runners, map[string]interface{}{
-				"name": name, "status": status, "image": image,
-			})
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(runners)
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(runners)
 	}))
 
 	mux.HandleFunc("/api/v1/runners/add", authReq(func(w http.ResponseWriter, r *http.Request) {
@@ -328,19 +353,63 @@ func startWebServer(port int) {
 		}
 		if strings.HasSuffix(name, "/restart") {
 			name = strings.TrimSuffix(name, "/restart")
-			dockerCompose("restart", name)
+			cmd := exec.Command("docker", "restart", name)
+			cmd.Run()
 			jsonResp(w, map[string]string{"status": "restarted"})
 			return
 		}
 		if strings.HasSuffix(name, "/stop") {
 			name = strings.TrimSuffix(name, "/stop")
-			dockerCompose("stop", name)
+			cmd := exec.Command("docker", "stop", name)
+			cmd.Run()
 			jsonResp(w, map[string]string{"status": "stopped"})
 			return
 		}
+		if strings.HasSuffix(name, "/start") {
+			name = strings.TrimSuffix(name, "/start")
+			cmd := exec.Command("docker", "start", name)
+			cmd.Run()
+			jsonResp(w, map[string]string{"status": "started"})
+			return
+		}
+		if strings.HasSuffix(name, "/edit") && r.Method == "POST" {
+			name = strings.TrimSuffix(name, "/edit")
+			var req struct {
+				Labels string `json:"labels"`
+			}
+			if err := jsonDec(r, &req); err != nil {
+				jsonErr(w, "invalid json", 400)
+				return
+			}
+			// Update .runner file labels
+			runnerFile := "/root/forgejo-runner/data/.runner"
+			if name != "runner" {
+				runnerFile = "/root/forgejo-runner/data/" + name + "/.runner"
+			}
+			data, err := os.ReadFile(runnerFile)
+			if err != nil {
+				jsonErr(w, "runner config not found", 404)
+				return
+			}
+			var rf struct {
+				Labels []string `json:"labels"`
+			}
+			json.Unmarshal(data, &rf)
+			rf.Labels = strings.Split(req.Labels, ",")
+			for i := range rf.Labels {
+				rf.Labels[i] = strings.TrimSpace(rf.Labels[i])
+			}
+			newData, _ := json.MarshalIndent(rf, "", "  ")
+			os.WriteFile(runnerFile, newData, 0644)
+			// Restart runner to apply
+			cmd := exec.Command("docker", "restart", name)
+			cmd.Run()
+			jsonResp(w, map[string]string{"status": "updated"})
+			return
+		}
 		if r.Method == "DELETE" {
-			dockerCompose("stop", name)
-			dockerCompose("rm", name)
+			cmd := exec.Command("docker", "rm", "-f", name)
+			cmd.Run()
 			jsonResp(w, map[string]string{"status": "removed"})
 			return
 		}

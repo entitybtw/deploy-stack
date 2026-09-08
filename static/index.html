@@ -15,23 +15,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 nav{padding:10px 0;border-bottom:1px solid var(--br1)}
 .ni{max-width:1040px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .logo{font-size:1rem;font-weight:700;color:var(--accent);white-space:nowrap}.logo span{color:var(--t2)}
-.nt{display:flex;margin:0 auto}.ntb{padding:6px 14px;font-size:13px;color:var(--t1);cursor:pointer;border-bottom:2px solid transparent;font-weight:500}.ntb:hover{color:var(--t0)}.ntb.a{color:var(--accent);border-bottom-color:var(--accent)}
+.nt{display:flex;margin:0 auto}.ntb{padding:6px 14px;font-size:13px;color:var(--t1);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;transition:color .15s}.ntb:hover{color:var(--t0)}.ntb.a{color:var(--accent);border-bottom-color:var(--accent)}
 .st{display:flex;gap:12px;font-size:12px;color:var(--t2);flex-wrap:wrap;white-space:nowrap}.st b{color:var(--t0)}
 .sh{display:flex;align-items:center;gap:10px;margin:20px 0 12px;flex-wrap:wrap}
 .sh-t{font-size:13px;color:var(--t2);font-weight:500}
-.c{background:var(--b1);border:1px solid var(--br1);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.c{background:var(--b1);border:1px solid var(--br1);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;transition:border-color .15s}
 .c:hover{border-color:var(--br2)}
 .cn{font-weight:600;font-size:13px;min-width:80px}
-.cm{font-family:monospace;font-size:11px;padding:2px 7px;background:var(--ag);color:var(--accent);border:1px solid rgba(122,157,184,.2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
-.cv{font-family:monospace;font-size:12px;color:var(--t1)}
-.b{font-size:11px;padding:3px 8px;text-align:center;font-weight:500;white-space:nowrap;border:1px solid var(--br2);background:transparent;color:var(--t1);cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+.cm{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:2px 7px;background:var(--ag);color:var(--accent);border:1px solid rgba(122,157,184,.2);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.cv{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--t1)}
+.b{font-size:11px;padding:3px 8px;text-align:center;font-weight:500;white-space:nowrap;border:1px solid var(--br2);background:transparent;color:var(--t1);cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:all .12s}
 .b:hover{border-color:var(--accent);color:var(--t0)}
-.b-on{background:rgba(119,153,64,.12);color:#7a9;color:var(--grn,#7a9);border-color:rgba(119,153,64,.3)}
-.b-off{background:rgba(221,119,119,.08);color:var(--red,#d77);border-color:rgba(221,119,119,.2)}
+.b-on{background:rgba(119,153,64,.12);color:var(--t0);border-color:rgba(119,153,64,.3)}
+.b-off{background:rgba(221,119,119,.08);color:var(--t0);border-color:rgba(221,119,119,.2)}
 .b-p{background:var(--accent);color:#fff;border-color:var(--accent)}.b-p:hover{opacity:.9}
-.b-y{background:rgba(221,215,119,.1);color:var(--yel,#dd7);border-color:rgba(221,215,119,.25)}
-.b-r{background:rgba(221,119,119,.08);color:var(--red,#d77);border-color:rgba(221,119,119,.2)}
-.b-g{background:rgba(119,153,64,.1);color:var(--grn,#7a9);border-color:rgba(119,153,64,.25)}
+.b-y{background:rgba(221,215,119,.1);color:var(--t0);border-color:rgba(221,215,119,.25)}
+.b-r{background:rgba(221,119,119,.08);color:var(--t0);border-color:rgba(221,119,119,.2)}
+.b-g{background:rgba(119,153,64,.1);color:var(--t0);border-color:rgba(119,153,64,.25)}
 .ca{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
 .emp{text-align:center;padding:30px;color:var(--t2);font-size:13px}
 .mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center;padding:16px;cursor:pointer}.mbg.on{display:flex}
@@ -41,21 +41,23 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
 .fg input,.fg select,.fg textarea{width:100%;padding:6px 9px;background:var(--b2);border:1px solid var(--br1);color:var(--t0);font-size:13px;font-family:inherit}
 .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent)}
 .fa{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-.ab{position:fixed;bottom:16px;right:16px;width:40px;height:40px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.3);z-index:50;border:none;cursor:pointer;font-size:20px}.ab:hover{opacity:.9}
+.ab{position:fixed;bottom:20px;right:20px;width:44px;height:44px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);z-index:50;border:none;cursor:pointer;font-size:22px;border-radius:50%;transition:transform .12s,opacity .12s}.ab:hover{opacity:.9;transform:scale(1.05)}
 .lbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:flex-start;justify-content:center;padding:40px 16px;cursor:pointer;overflow-y:auto}.lbg.on{display:flex}
 .lb{background:var(--b1);border:1px solid var(--br2);padding:14px;width:100%;max-width:900px;max-height:80vh;display:flex;flex-direction:column;cursor:default}
-.lb pre{flex:1;overflow:auto;font-family:monospace;font-size:12px;color:var(--t1);white-space:pre-wrap;word-break:break-all;max-height:65vh}
+.lb pre{flex:1;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--t1);white-space:pre-wrap;word-break:break-all;max-height:65vh}
 #lp{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
 .lx{background:var(--b1);border:1px solid var(--br2);padding:24px 28px;width:320px;max-width:100%}
 .lx h1{text-align:center;margin-bottom:14px;font-size:15px}
 .lx .logo{text-align:center;font-size:1.15rem;font-weight:700;color:var(--accent);margin-bottom:14px}.lx .logo span{color:var(--t2)}
-.ib{padding:5px;border:1px solid var(--br2);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;color:var(--t1);transition:all .15s}.ib:hover{border-color:var(--accent);color:var(--t0)}
+.ib{padding:5px;border:1px solid var(--br2);background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;color:var(--t1);transition:all .15s;border-radius:50%}.ib:hover{border-color:var(--accent);color:var(--t0)}
 .ib svg{width:16px;height:16px;fill:currentColor}
-.exec-output{background:#111;color:#ccc;padding:8px;font-family:monospace;font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap;margin-top:8px;display:none;border:1px solid var(--br1)}
+.exec-output{background:#111;color:#ccc;padding:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap;margin-top:8px;display:none;border:1px solid var(--br1)}
 .exec-output.on{display:block}
 .tag{display:inline-block;font-size:10px;padding:1px 5px;border:1px solid var(--br2);color:var(--t2);margin-left:4px}
 .srv-sec{margin-top:14px;padding-top:12px;border-top:1px solid var(--br1)}
 .srv-sec h3{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t1)}
+.srv-item{background:var(--b2);border:1px solid var(--br1);padding:8px 10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.srv-item:hover{border-color:var(--br2)}
 @media(max-width:600px){.c{flex-direction:column;align-items:flex-start;gap:6px}.ca{margin-left:0;width:100%}.ca .b{flex:1}.nt{overflow-x:auto}.ntb{padding:6px 10px;font-size:12px}.st{display:none}}
 </style>
 </head>
@@ -98,7 +100,7 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
         <div style="font-weight:600;font-size:13px">Accent Color</div>
         <div id="acPresets" style="display:flex;gap:6px;flex-wrap:wrap"></div>
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="color" id="acPick" style="width:32px;height:32px;padding:0;border:none;cursor:pointer" onchange="applyAccent(this.value)">
+          <input type="color" id="acPick" style="width:32px;height:32px;padding:0;border:none;cursor:pointer;border-radius:50%" onchange="applyAccent(this.value)">
           <input id="acHex" style="width:80px;padding:4px 6px;background:var(--b2);border:1px solid var(--br1);color:var(--t0);font-size:12px;font-family:monospace" onkeydown="if(event.key==='Enter')applyAccent(this.value)">
         </div>
       </div>
@@ -135,7 +137,7 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
   <h2>Add Server</h2>
   <div class="fg"><label>Name</label><input id="sN" placeholder="prod-1"></div>
   <div class="fg"><label>Host (IP)</label><input id="sH" placeholder="10.0.0.103"></div>
-  <div class="fg"><label>API Port</label><input id="sP" type="number" value="3000"></div>
+  <div class="fg"><label>API Port</label><input id="sP" type="number" value="9090"></div>
   <div class="fg"><label>Login</label><input id="sU" placeholder="admin"></div>
   <div class="fg"><label>Password</label><input id="sW" type="password"></div>
   <div class="fa"><button class="b" onclick="hideModal('mSrv')">Cancel</button><button class="b b-p" onclick="addServer()">Connect</button></div>
@@ -196,7 +198,7 @@ function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h
 function hexAlpha(hex,a){var r=hexToRgb(hex);return'rgba('+r[0]+','+r[1]+','+r[2]+','+a+')'}
 function applyAccent(hex){hex=hex.trim();if(!/^#[0-9a-fA-F]{3,8}$/.test(hex))return;document.documentElement.style.setProperty('--accent',hex);document.documentElement.style.setProperty('--ag',hexAlpha(hex,.1));localStorage.setItem('ds-accent',hex);$('acPick').value=hex;$('acHex').value=hex;renderAccentPresets()}
 function initAccent(){applyAccent(localStorage.getItem('ds-accent')||'#7a9db8')}
-function renderAccentPresets(){$('acPresets').innerHTML=ACCENTS.map(function(c){return'<button onclick="applyAccent(\''+c+'\')" style="width:28px;height:28px;background:'+c+';border:2px solid '+(localStorage.getItem('ds-accent')===c?'var(--t0)':'transparent')+';cursor:pointer"></button>'}).join('')}
+function renderAccentPresets(){$('acPresets').innerHTML=ACCENTS.map(function(c){return'<button onclick="applyAccent(\''+c+'\')" style="width:28px;height:28px;background:'+c+';border:2px solid '+(localStorage.getItem('ds-accent')===c?'var(--t0)':'transparent')+';cursor:pointer;border-radius:50%"></button>'}).join('')}
 function setTheme(t){document.documentElement.dataset.theme=t;localStorage.setItem('ds-t',t)}
 function cycleTheme(){var cs=['dark','light','black'],c=document.documentElement.dataset.theme||'dark';setTheme(cs[(cs.indexOf(c)+1)%cs.length])}
 initAccent();setTheme(localStorage.getItem('ds-t')||'dark');
@@ -237,7 +239,7 @@ function loadContainers(){
       var tags=x.managed?'<span class="tag">managed</span>':'';
       var portStr=x.ports?'<div class="cv">'+e(x.ports)+'</div>':'';
       var n=esc(x.name);
-      return'<div class="c" style="border-left:3px solid '+(up?'#7a9':'#d77')+'"><div class="cn">'+e(x.name)+tags+'</div><div class="cm" title="'+e(x.image)+'">'+e(x.image)+'</div>'+portStr+statusBadge(st)+'<div class="ca"><button class="b" onclick="doExec(\''+n+'\')">exec</button><button class="b" onclick="doLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doInspect(\''+n+'\',\''+e(x.name)+'\')">info</button>'+(up?'<button class="b b-y" onclick="doAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doAction(\''+n+'\',\'stop\')">stop</button>':'<button class="b b-g" onclick="doAction(\''+n+'\',\'start\')">start</button>')+'<button class="b b-r" onclick="doRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>';
+      return'<div class="c" style="border-left:3px solid '+(up?'var(--t1)':'var(--br2)')+'"><div class="cn">'+e(x.name)+tags+'</div><div class="cm" title="'+e(x.image)+'">'+e(x.image)+'</div>'+portStr+statusBadge(st)+'<div class="ca"><button class="b" onclick="doExec(\''+n+'\')">exec</button><button class="b" onclick="doLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doInspect(\''+n+'\',\''+e(x.name)+'\')">info</button>'+(up?'<button class="b b-y" onclick="doAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doAction(\''+n+'\',\'stop\')">stop</button>':'<button class="b b-g" onclick="doAction(\''+n+'\',\'start\')">start</button>')+'<button class="b b-r" onclick="doRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>';
     }).join('');
   }).catch(function(er){$('containers').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
@@ -252,7 +254,7 @@ function addSite(){var n=$('fN').value;if(!n)return alert('Name required');api('
 /* ── Cluster ── */
 var curSrvId='',curSrvName='';
 function loadCluster(){api('GET','/api/v1/servers').then(function(s){s=s||[];$('nSR').textContent=s.length;$('sre').style.display=s.length?'none':'block';$('servers').innerHTML=s.map(function(x){return'<div class="c"><div class="cn">'+e(x.name)+'</div><div class="cm">'+e(x.host)+':'+x.port+'</div>'+statusBadge(x.online?'online':'offline')+'<div class="ca"><button class="b" onclick="openSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">manage</button><button class="b b-r" onclick="rmSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">remove</button></div></div>'}).join('')}).catch(function(){})}
-function addServer(){var n=$('sN').value,h=$('sH').value;if(!n||!h)return alert('Name and host required');api('POST','/api/v1/servers',{name:n,host:h,port:parseInt($('sP').value)||3000,user:$('sU').value,pass:$('sW').value}).then(function(){hideModal('mSrv');setTimeout(loadCluster,1000)})}
+function addServer(){var n=$('sN').value,h=$('sH').value;if(!n||!h)return alert('Name and host required');api('POST','/api/v1/servers',{name:n,host:h,port:parseInt($('sP').value)||9090,user:$('sU').value,pass:$('sW').value}).then(function(){hideModal('mSrv');setTimeout(loadCluster,1000)})}
 function rmSrv(id,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id).then(function(){loadCluster()})}
 
 function openSrv(id,name){curSrvId=id;curSrvName=name;$('srvTitle').textContent=name;$('srvBody').innerHTML='<div style="padding:20px;color:var(--t2)">Loading...</div>';showModal('mSrvDetail');srvRefresh()}
@@ -267,9 +269,10 @@ function srvRefresh(){
     var h='<div class="srv-sec" style="margin-top:0;border-top:none"><h3>Containers ('+cc.length+')</h3></div>';
     cc.forEach(function(c){
       var up=(c.status||'').indexOf('Up')>=0;var n=esc(c.name);var si=esc(id);
-      h+='<div class="c" style="margin:0 0 4px"><div class="cn">'+e(c.name)+'</div>'+statusBadge(c.status||'?')+'<div class="ca">';
+      h+='<div class="srv-item"><div class="cn">'+e(c.name)+'</div>'+statusBadge(c.status||'?')+'<div class="ca">';
       h+='<button class="b" onclick="srvExec(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">exec</button>';
       h+='<button class="b" onclick="srvLogs(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">logs</button>';
+      h+='<button class="b" onclick="srvInspect(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">info</button>';
       if(up){h+='<button class="b b-y" onclick="srvAction(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvAction(\''+si+'\',\''+n+'\',\'stop\')">stop</button>';}
       else{h+='<button class="b b-g" onclick="srvAction(\''+si+'\',\''+n+'\',\'start\')">start</button>';}
       h+='</div></div>';
@@ -277,15 +280,19 @@ function srvRefresh(){
     if(!cc.length)h+='<div class="emp">No containers (server may be offline)</div>';
     h+='<div class="srv-sec"><h3>Runners ('+rr.length+')</h3></div>';
     rr.forEach(function(r){
-      var up=(r.status||'').indexOf('Up')>=0;
-      h+='<div class="c" style="margin:0 0 4px"><div class="cn">'+e(r.name)+'</div>'+statusBadge(r.status||'?')+'</div>';
+      var up=(r.status||'').indexOf('Up')>=0;var lbl=r.labels?e(r.labels):'';
+      h+='<div class="srv-item"><div class="cn">'+e(r.name)+'</div><div class="cm">'+lbl+'</div>'+statusBadge(r.status||'?')+'<div class="ca">';
+      h+='<button class="b" onclick="srvRunnerLogs(\''+esc(id)+'\',\''+esc(r.name)+'\',\''+e(r.name)+'\')">logs</button>';
+      h+='</div></div>';
     });
     $('srvBody').innerHTML=h;
   }).catch(function(er){$('srvBody').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 function srvExec(id,cn,name){var cmd=prompt('Command for '+name+':');if(!cmd)return;api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/exec',{cmd:cmd}).then(function(r){$('lb').textContent=typeof r==='string'?r:JSON.stringify(r,null,2);$('logTitle').textContent='Result: '+name;$('mLog').classList.add('on')}).catch(function(er){alert('Error: '+er)})}
 function srvLogs(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/logs?tail=200').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
+function srvInspect(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')}).catch(function(er){$('ib').textContent='Error: '+er})}
 function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){setTimeout(srvRefresh,1000)})}
+function srvRunnerLogs(id,rn,name){api('GET','/api/v1/servers/'+id+'/runners/'+rn+'/logs?tail=200').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Runner Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
 
 /* ── Runners ── */
 function loadRunners(){api('GET','/api/v1/runners').then(function(r){r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';$('runners').innerHTML=r.map(function(x){var up=(x.status||'').indexOf('Up')>=0;var n=esc(x.name);var lbl=x.labels?e(x.labels):'';return'<div class="c"><div class="cn">'+e(x.name)+'</div><div class="cm" title="'+lbl+'">'+lbl+'</div><div class="cm">'+e(x.image||'')+'</div>'+statusBadge(x.status||'?')+'<div class="ca"><button class="b" onclick="doRunnerLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="editRunner(\''+n+'\',\''+e(x.name)+'\',\''+lbl+'\')">edit</button><button class="b" onclick="doRunnerAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doRunnerAction(\''+n+'\',\'stop\')">stop</button><button class="b b-r" onclick="doRunnerRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>'}).join('')}).catch(function(){})}

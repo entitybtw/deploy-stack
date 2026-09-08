@@ -1,49 +1,149 @@
 # deploy-stack
 
-**Universal Docker deployment platform.** One binary, any language, zero config.
-
-Deploy any site with a single `git push`. No Dockerfiles, no YAML templates, no manual setup.
+Universal Docker deployment platform with web UI, API, cluster management, and Forgejo CI/CD runners.
 
 ## Features
 
-- **Auto-detect language** — PHP, Python, Go, Rust, Node.js, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, and static sites
-- **Auto-detect frameworks** — Django, Flask, FastAPI, Laravel, Bun, Deno
-- **Auto-generate Dockerfile** — based on project files
-- **Auto-pick port** — finds available ports automatically
-- **Auto-migrate** — runs `install/migrate.sh` or `artisan migrate` on deploy
-- **SQLite safe** — database files are never overwritten by rsync
-- **Multi-runner** — multiple Forgejo runners in one compose
-- **Single binary** — 3.5MB Go binary, no dependencies
+- **Containers** — list, exec, logs, inspect, start/stop/restart/remove
+- **Cluster** — manage multiple servers from one UI, full container/runner control on remote servers
+- **Runners** — Forgejo/Gitea/GitHub runner management with labels, logs, edit
+- **Settings** — accent color, themes (dark/light/black), show/hide all containers
+- **Auto-detection** — PHP, Python, Node.js, Go, Rust, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, Bun, Deno
+- **CLI** — `deploy add/rm/list/serve/add-runner/rm-runner`
+- **Webhook** — auto-deploy on push via Forgejo/Gitea webhooks
+
+## Architecture
+
+```
+Host
+├── node-ci: Forgejo (git.example.com:3006) + services
+├── node-4: deploy-stack (port 9090) + example.com (port 8088)
+│   └── Runner: my-site:host
+├── node-web: deploy-stack (port 9090) + N sites
+│   └── Runner: webserver:host
+└── node-app: deploy-stack (port 9090) + N sites
+    └── Runner: worker:host
+```
 
 ## Quick Start
 
-### Install
+### 1. Install Go and build
 
 ```bash
-# Linux amd64
-curl -L https://git.example.com/example/deploy-stack/raw/branch/main/dist/deploy-linux-amd64 -o /usr/local/bin/deploy
-chmod +x /usr/local/bin/deploy
+# On your build machine
+git clone https://git.example.com/example/deploy-stack.git
+cd deploy-stack
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy .
 ```
 
-### Start web UI
+### 2. Deploy to server (Docker/host)
 
 ```bash
-deploy serve --port 3000
-# Open http://localhost:3000
-# Login: admin / admin (change via DEPLOY_ADMIN_USER/DEPLOY_ADMIN_PASS)
+# Copy binary and static files
+scp deploy root@SERVER:/root/deploy-stack/deploy
+scp -r static/ root@SERVER:/root/deploy-stack/static/
+
+# Create data dir
+mkdir -p /root/deploy-stack/data
+
+# Start
+/root/deploy-stack/deploy serve --port 9090
 ```
 
-### CLI mode
+### 3. Or use docker-compose
 
 ```bash
-deploy add mysite /var/www/mysite --port 8080
-deploy list
-deploy status
+# On the target server
+cd /root/deploy-stack
+docker compose up -d
 ```
 
-### Add to your repo
+### 4. First login
 
-Create `.forgejo/workflows/deploy.yml`:
+Open `http://SERVER:9090` in browser.  
+Default credentials: `admin` / `admin`
+
+Change password via environment:
+
+```bash
+DEPLOY_ADMIN_PASS=your-password /root/deploy-stack/deploy serve --port 9090
+```
+
+## CLI Usage
+
+```bash
+deploy                                  # Interactive mode
+deploy add <name> <dir> [--port N]      # Add site (auto-detect language)
+deploy rm <name>                        # Remove site
+deploy list                             # List all sites
+deploy runners                          # List all runners
+deploy add-runner <name> <token>        # Add Forgejo runner
+deploy rm-runner [name]                 # Remove runner(s)
+deploy status                           # Show containers
+deploy up / down                        # Start/stop all
+deploy serve --port 9090                # Start web server
+```
+
+## API
+
+All endpoints require `Authorization: Bearer <token>` header.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/login` | Get auth token |
+| POST | `/api/v1/logout` | Invalidate token |
+| GET | `/api/v1/status` | Server status |
+| GET | `/api/v1/containers` | List containers |
+| POST | `/api/v1/containers/:name/exec` | Execute command in container |
+| GET | `/api/v1/containers/:name/logs` | Container logs |
+| GET | `/api/v1/containers/:name/inspect` | Container inspect JSON |
+| POST | `/api/v1/containers/:name/start` | Start container |
+| POST | `/api/v1/containers/:name/stop` | Stop container |
+| POST | `/api/v1/containers/:name/restart` | Restart container |
+| DELETE | `/api/v1/containers/:name/remove` | Remove container |
+| GET | `/api/v1/runners` | List runners |
+| POST | `/api/v1/runners/add` | Add runner |
+| POST | `/api/v1/runners/:name/edit` | Edit runner labels |
+| GET | `/api/v1/runners/:name/logs` | Runner logs |
+| POST | `/api/v1/runners/:name/restart` | Restart runner |
+| POST | `/api/v1/runners/:name/stop` | Stop runner |
+| DELETE | `/api/v1/runners/:name` | Remove runner |
+| GET | `/api/v1/servers` | List cluster servers |
+| POST | `/api/v1/servers` | Add server to cluster |
+| DELETE | `/api/v1/servers/:id` | Remove server |
+| GET | `/api/v1/servers/:id/containers` | Remote containers |
+| GET | `/api/v1/servers/:id/runners` | Remote runners |
+| POST | `/api/v1/servers/:id/containers/:name/exec` | Remote exec |
+
+### Login example
+
+```bash
+curl -X POST http://localhost:9090/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"<user>","password":"<pass>"}'
+# Returns: {"status":"ok","token":"<token>"}
+```
+
+### Container exec example
+
+```bash
+curl -X POST http://localhost:9090/api/v1/containers/my-site-php/exec \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"cmd":"ls /var/www"}'
+```
+
+## Runner Labels
+
+Labels determine which workflow runs on which server. Format: `label:host`
+
+| Label | Server | Sites |
+|-------|--------|-------|
+| `my-site:host` | node-4 | my-app (example.com) |
+| `web:host` | node-web | site-alpha, site-beta |
+| `worker:host` | node-app | worker, worker-old |
+
+### Workflow example
 
 ```yaml
 name: Deploy
@@ -52,144 +152,99 @@ on:
     branches: [main]
 jobs:
   deploy:
-    runs-on: example
+    runs-on: web  # matches runner with label "web"
     steps:
       - uses: actions/checkout@v4
       - name: Deploy
         run: |
-          rsync -a --delete \
-            --exclude='.git' \
-            --exclude='*.db' --exclude='*.sqlite' --exclude='*.sqlite3' \
-            --exclude='*.db-wal' --exclude='*.db-shm' \
-            ./ /var/www/mysite/
-          deploy add mysite /var/www/mysite --port 8080
+          rsync -a --delete --exclude='.git' ./ /var/www/my-site/
+          deploy add my-site /var/www/my-site --port 8080
 ```
 
-**Push code → site is live.** That's it.
+## Forgejo Runner Setup
 
-## Commands
+### Prerequisites
 
-| Command | Description |
-|---------|-------------|
-| `deploy` | Interactive mode — add site step by step |
-| `deploy add <name> <dir>` | Add site (auto-detect language & port) |
-| `deploy add <name> <dir> --port 8080 --type php` | Add with explicit port and type |
-| `deploy rm <name>` | Remove site |
-| `deploy list` | List all sites |
-| `deploy status` | Show container status |
-| `deploy up` | Start all services |
-| `deploy down` | Stop all services |
-| `deploy serve --port 3000` | Start web UI + API |
-| `deploy add-runner <name> <token>` | Add Forgejo runner |
-| `deploy rm-runner [name]` | Remove runner(s) |
-| `deploy runners` | List all runners |
+- Forgejo instance with Actions enabled
+- Runner token from Forgejo admin panel
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DEPLOY_ADMIN_USER` | `admin` | Web UI login |
-| `DEPLOY_ADMIN_PASS` | `admin` | Web UI password |
-
-## Supported Languages
-
-| Language | Detection | Frameworks |
-|----------|-----------|------------|
-| PHP | `.php`, `composer.json` | Laravel, Symfony, WordPress |
-| Python | `.py`, `requirements.txt` | Django, Flask, FastAPI |
-| Node.js | `package.json` | Express, Nest.js |
-| TypeScript | `.ts` + `package.json` | — |
-| Bun | `bun.lockb` | — |
-| Deno | `deno.json` | — |
-| Go | `go.mod` | Gin, Echo, Fiber |
-| Rust | `Cargo.toml` | Actix, Axum |
-| Java/Kotlin | `pom.xml`, `build.gradle` | Spring Boot |
-| .NET/C# | `*.csproj` | ASP.NET |
-| Ruby | `Gemfile` | Rails, Sinatra |
-| Elixir | `mix.exs` | Phoenix |
-| Haskell | `*.cabal`, `stack.yaml` | — |
-| Lua | `.lua` | — |
-| Zig | `build.zig` | — |
-| Nim | `*.nimble` | — |
-| Swift | `Package.swift` | — |
-| C/C++ | `.c`, `.cpp`, `CMakeLists.txt` | — |
-| Static | `index.html` | nginx |
-
-## How It Works
-
-```
-git push → Forgejo Runner → deploy add → Docker Compose → Site live
-```
-
-1. **Push code** to Forgejo
-2. **Runner** picks up the push and runs the workflow
-3. **rsync** copies code to `/var/www/<site>/` (excluding `.git` and `*.db`)
-4. **deploy** auto-detects language, generates Dockerfile, builds image
-5. **Docker Compose** starts the container
-6. **Migration** runs automatically if `install/migrate.sh` exists
-
-## Database Handling
-
-- Database files (`*.db`, `*.sqlite`) are **excluded from rsync** — they stay on the server forever
-- On **first deploy**: migration creates tables
-- On **subsequent deploys**: migration adds new tables/columns, data preserved
-- SQLite files are mounted via Docker volumes — no data loss on restart
-
-```
-Git repo:     code only (no .db files)
-Server:       code + database.sqlite (persistent)
-```
-
-## Architecture
-
-```
-/root/deploy-stack/
-├── docker-compose.yml      # All services: runners + sites
-├── deploy                  # Go binary (single file)
-├── templates/              # Dockerfiles for each language
-│   ├── php/Dockerfile
-│   ├── python/Dockerfile
-│   ├── go/Dockerfile
-│   ├── node/Dockerfile
-│   ├── rust/Dockerfile
-│   └── static/nginx.conf
-├── .env                    # Runner tokens
-└── dist/                   # Binaries for all platforms
-    ├── deploy-linux-amd64
-    ├── deploy-linux-arm64
-    ├── deploy-darwin-amd64
-    ├── deploy-darwin-arm64
-    └── deploy-windows-amd64.exe
-```
-
-## Custom Dockerfile
-
-If you need a custom build — put a `Dockerfile` in your project root:
-
-```
-/var/www/mysite/
-├── Dockerfile     # deploy uses this instead of the template
-├── main.go
-└── go.mod
-```
-
-## Build from Source
+### Register runner
 
 ```bash
-git clone https://git.example.com/example/deploy-stack.git
-cd deploy-stack
-go build -o deploy .
+# On the target host
+mkdir -p /root/forgejo-runner/data
+# Download act_runner binary
+# Register with token:
+./act_runner register --config /root/forgejo-runner/data/config.yaml
 ```
 
-### Cross-compile
+### Runner docker-compose (deploy-stack)
+
+The runner is included in `docker-compose.yml`:
+
+```yaml
+runner:
+  image: data.forgejo.org/forgejo/runner:4.0.0
+  container_name: runner
+  user: root
+  restart: unless-stopped
+  volumes:
+    - /root/forgejo-runner/data:/data
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /var/www:/var/www
+    - /root/deploy-stack:/root/deploy-stack
+  command: >
+    sh -c "sleep 10 &&
+           apk update && apk add --no-cache nodejs npm rsync &&
+           ln -sf /root/deploy-stack/deploy /usr/local/bin/deploy &&
+           forgejo-runner daemon --config /data/config.yaml"
+```
+
+## Cluster Management
+
+Add remote deploy-stack servers to manage them from one UI:
+
+1. Go to **Cluster** tab
+2. Click **+** → Add Server
+3. Enter: Name, Host (IP), API Port, Login, Password
+4. Click **Connect**
+5. Click **manage** to open full control panel
+
+The panel shows all containers and runners on the remote server with exec, logs, start/stop/restart controls.
+
+## Updating
 
 ```bash
-GOOS=linux GOARCH=amd64 go build -o dist/deploy-linux-amd64 .
-GOOS=linux GOARCH=arm64 go build -o dist/deploy-linux-arm64 .
-GOOS=darwin GOARCH=arm64 go build -o dist/deploy-darwin-arm64 .
-GOOS=windows GOARCH=amd64 go build -o dist/deploy-windows-amd64.exe .
+cd /root/deploy-stack
+git pull
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy .
+pkill -9 -f "deploy serve"
+nohup /root/deploy-stack/deploy serve --port 9090 >/dev/null 2>&1 &
 ```
+
+## Supported Languages (auto-detected)
+
+| Language | Dockerfile | Default Port |
+|----------|------------|--------------|
+| Static HTML | nginx:alpine | 8080 |
+| PHP 8.2 | php:8.2-fpm-alpine | 9000 |
+| Python 3.12 | python:3.12-alpine | 8000 |
+| Node.js 20 | node:20-alpine | 3000 |
+| Bun | oven/bun:alpine | 3000 |
+| Deno | denoland/deno:alpine | 8000 |
+| Go | golang:1.22-alpine | 8080 |
+| Rust | rust:1.77-alpine | 8080 |
+| Java/Kotlin | eclipse-temurin:21 | 8080 |
+| .NET/C# | mcr.microsoft.com/dotnet | 8080 |
+| Ruby 3.3 | ruby:3.3-alpine | 3000 |
+| Elixir 1.16 | elixir:1.16-alpine | 4000 |
+| Haskell 9.6 | haskell:9.6-alpine | 8080 |
+| Lua 5.4 | lua:5.4-alpine | 8080 |
+| Zig 0.11 | zig:0.11-alpine | 8080 |
+| Nim | nimlang/nim:alpine | 8080 |
+| Swift 5.10 | swift:5.10-alpine | 8080 |
+| C/C++ | gcc:alpine | 8080 |
 
 ## License
 
-MIT License — Copyright (c) 2026 [example](https://git.example.com/example)
+MIT

@@ -397,6 +397,20 @@ func readCompose() string {
 
 func writeCompose(c string) { os.WriteFile(composePath(), []byte(c), 0644) }
 
+func insertService(content, block string) string {
+	// Find the top-level "volumes:" key and insert before it
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "volumes:" && (i == 0 || (!strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t"))) {
+			// Insert before this line
+			result := strings.Join(lines[:i], "\n") + "\n" + strings.TrimLeft(block, "\n") + "\n" + strings.Join(lines[i:], "\n")
+			return result
+		}
+	}
+	// No volumes section found, just append
+	return strings.TrimRight(content, "\n") + "\n" + block
+}
+
 func defaultCompose() string {
 	return `services:
   runner:
@@ -511,7 +525,7 @@ func addRunner(name, token, forgejoURL string) {
       - /var/www:/var/www
     command: sh -c "sleep 10 && apk update && apk add --no-cache nodejs npm && forgejo-runner daemon --config /data/config.yaml"
 `, svc, svc, token, forgejoURL, svc)
-	content = strings.TrimRight(content, "\n") + "\n" + block
+	content = insertService(content, block)
 	writeCompose(content)
 	fmt.Printf("✓ Runner '%s' added\n", svc)
 }
@@ -570,7 +584,7 @@ func interactive() {
 
 	content := readCompose()
 	content = removeService(content, name)
-	content = strings.TrimRight(content, "\n") + "\n" + buildServiceBlock(name, dir, port, lang)
+	content = insertService(content, buildServiceBlock(name, dir, port, lang))
 	writeCompose(content)
 
 	svc := name; if lang.Name == "php" { svc = name + "-php" }
@@ -600,7 +614,8 @@ func main() {
 		}
 		fmt.Printf("Adding %s (%s) port %d...\n", name, lang.Name, port)
 		c := readCompose(); c = removeService(c, name)
-		c = strings.TrimRight(c, "\n") + "\n" + buildServiceBlock(name, dir, port, lang)
+		c = removeService(c, name)
+		c = insertService(c, buildServiceBlock(name, dir, port, lang))
 		writeCompose(c)
 		svc := name; if lang.Name == "php" { svc = name + "-php" }
 		dockerCompose("up", "-d", "--build", svc)

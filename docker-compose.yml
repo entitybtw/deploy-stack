@@ -22,9 +22,11 @@ services:
       - /root/forgejo-runner/data:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/www:/var/www
+      - /root/deploy-stack:/root/deploy-stack
     command: >
       sh -c "sleep 10 &&
-             apk update && apk add --no-cache nodejs npm &&
+             apk update && apk add --no-cache nodejs npm rsync &&
+             ln -sf /root/deploy-stack/deploy /usr/local/bin/deploy &&
              forgejo-runner daemon --config /data/config.yaml"
 
 volumes:

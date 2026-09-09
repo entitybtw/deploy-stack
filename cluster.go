@@ -235,8 +235,20 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	if len(parts) >= 2 {
 		action := parts[1]
 
-		// GET /servers/:id/containers
-		if action == "containers" && r.Method == "GET" {
+	// ── агрегированная сводка сервера ──
+	if action == "status" && r.Method == "GET" {
+		data, err := cl.store.CallServer(id, "GET", "/api/v1/status", nil)
+		if err != nil {
+			jsonErr(w, err.Error(), 502)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+		return
+	}
+
+	// GET /servers/:id/containers
+	if action == "containers" && r.Method == "GET" {
 			data, err := cl.store.CallServer(id, "GET", "/api/v1/containers?show_all=true", nil)
 			if err != nil {
 				jsonErr(w, err.Error(), 502)

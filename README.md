@@ -5,7 +5,8 @@ Universal Docker deployment platform with web UI, API, cluster management, and F
 ## Features
 
 - **Containers** — list, exec, logs, inspect, start/stop/restart/remove
-- **Cluster** — manage multiple servers from one UI, full container/runner control on remote servers
+- **Cluster** — карточки серверов + «manage» открывает полноценный менеджер ноды
+  (вкладки Containers / Runners / System, действия exec·logs·start·stop·restart·rm)
 - **Runners** — Forgejo/Gitea/GitHub runner management with labels, logs, edit
 - **Settings** — accent color, themes (dark/light/black), show/hide all containers
 - **Auto-detection** — PHP, Python, Node.js, Go, Rust, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, Bun, Deno
@@ -57,6 +58,22 @@ mkdir -p /root/deploy-stack/data
 cd /root/deploy-stack
 docker compose up -d
 ```
+
+### Контейнерная поставка (одна команда для любого Docker-хоста)
+
+В репозитории лежит готовый `docker-compose.yml` который поднимает панель-менеджер
+и Forgejo runner одним стеком (панель работает через `docker.sock`, обязателен Linux-хост):
+
+```bash
+git clone https://git.example.com/example/deploy-stack.git
+cd deploy-stack
+cp .env.example .env        # задай DEPLOY_ADMIN_PASS (и токен раннера — опц.)
+docker compose up -d        # панель on :3000 (+ раннер при DEPLOY_RUNNER_REGTOKEN)
+```
+
+Панель можно запускать и как системный сервис на хосте (без контейнера) — тогда она
+управляет локальным демоном напрямую; оба способа дают один и тот же API/UI.
+
 
 ### 4. First login
 

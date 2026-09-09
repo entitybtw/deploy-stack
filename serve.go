@@ -45,7 +45,7 @@ func startWebServer(port int) {
 	auth := NewAuth()
 	hub := &Hub{clients: make(map[chan []byte]struct{})}
 	go hub.Run()
-	cl := NewCluster(filepath.Join(stackDir(), "data"))
+	cl := NewCluster(filepath.Join(deployHome(), "data"))
 
 	mux := http.NewServeMux()
 
@@ -221,6 +221,23 @@ func startWebServer(port int) {
 			return
 		}
 
+		if strings.HasSuffix(name, "/edit") {
+			name = strings.TrimSuffix(name, "/edit")
+			var req struct {
+				Port     int    `json:"port"`
+				HostPath string `json:"hostPath"`
+				HostIP   string `json:"hostIP"`
+				Type     string `json:"type"`
+			}
+			jsonDec(r, &req)
+			if err := recreateContainer(name, req.Port, req.HostPath, req.HostIP, req.Type); err != nil {
+				jsonErr(w, err.Error(), 400)
+				return
+			}
+			jsonResp(w, map[string]string{"status": "updated", "name": name})
+			return
+		}
+
 		jsonErr(w, "unknown action", 404)
 	}))
 
@@ -291,16 +308,16 @@ func startWebServer(port int) {
 				}
 				// Read labels from config.yaml
 				labels := ""
-				configPath := filepath.Join(stackDir(), "docker-compose.yml")
+				configPath := composePath()
 				if data, err := os.ReadFile(configPath); err == nil {
 					// Try to find runner labels in config
 					content := string(data)
 					_ = content
 				}
 				// Read from .runner file for labels
-				runnerFile := "/root/forgejo-runner/data/.runner"
+				runnerFile := filepath.Join(runnerDataRoot(), "data", ".runner")
 				if name != "runner" {
-					runnerFile = "/root/forgejo-runner/data/" + name + "/.runner"
+					runnerFile = filepath.Join(runnerDataRoot(), "data", name, ".runner")
 				}
 				if data, err := os.ReadFile(runnerFile); err == nil {
 					var rf struct {
@@ -382,9 +399,9 @@ func startWebServer(port int) {
 				return
 			}
 			// Update .runner file labels - preserve all other fields
-			runnerFile := "/root/forgejo-runner/data/.runner"
+			runnerFile := filepath.Join(runnerDataRoot(), "data", ".runner")
 			if name != "runner" {
-				runnerFile = "/root/forgejo-runner/data/" + name + "/.runner"
+				runnerFile = filepath.Join(runnerDataRoot(), "data", name, ".runner")
 			}
 			data, err := os.ReadFile(runnerFile)
 			if err != nil {
@@ -453,8 +470,9 @@ func startWebServer(port int) {
 
 func serveStaticFile(w http.ResponseWriter, r *http.Request, name string) {
 	paths := []string{
-		filepath.Join(filepath.Dir(os.Args[0]), "static", name),
+		filepath.Join(deployHome(), "static", name),
 		filepath.Join("/usr/local/share/deploy-stack/static", name),
+		filepath.Join(filepath.Dir(os.Args[0]), "static", name),
 		filepath.Join("/root/deploy-stack/static", name),
 	}
 	for _, p := range paths {
@@ -587,6 +605,103 @@ func listContainers(showAll bool) []map[string]interface{} {
 	}
 
 	return containers
+}
+
+// recreateContainer пересоздаёт managed-контейнер сайта с новым внешним портом,
+// хост-IP и/или папкой источников. Вызывается из панели при редактировании.
+func recreateContainer(name string, newPort int, hostPath, hostIP, typ string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	type mountInfo struct{ Src, Dst string; RW bool }
+
+	// 1. Получаем образ, сборку bind-маунтов и внутренний порт.
+	get := func(sep string, args ...string) string {
+		out, _ := exec.CommandContext(ctx, "docker", append([]string{"inspect", "-f", sep}, args...)...).Output()
+		return strings.TrimSpace(string(out))
+	}
+	image := get("{{.Config.Image}}", name)
+	if image == "" {
+		return fmt.Errorf("контейнер не найден")
+	}
+
+	// внутренний порт по .Config.ExposedPorts
+	exposedStr := get("{{range $p, $_ := .Config.ExposedPorts}}{{$p}} {{end}}", name)
+	innerPort := "80"
+	for _, e := range strings.Fields(exposedStr) {
+		if strings.HasPrefix(e, "80") { innerPort = "80"; break }
+		if p := strings.Split(e, "/")[0]; p != "" { innerPort = p; break }
+	}
+
+	// bind-маунты host-папки (Type=bind)
+	var binds []mountInfo
+	mountsJSON := get("{{json .Mounts}}", name)
+	if mountsJSON != "" {
+		var ms []struct {
+			Type   string `json:"Type"`
+			Source string `json:"Source"`
+			Dest   string `json:"Destination"`
+			RW     bool   `json:"RW"`
+		}
+		if json.Unmarshal([]byte(mountsJSON), &ms) == nil {
+			for _, m := range ms {
+				if m.Type != "bind" { continue }
+				src := m.Source
+				if hostPath != "" && (m.Dest == "/usr/share/nginx/html" || m.Dest == "/var/www/html") {
+					src = hostPath
+				}
+				binds = append(binds, mountInfo{Src: src, Dst: m.Dest, RW: m.RW})
+			}
+		}
+	}
+
+	// внешний порт по умолчанию из старых биндингов если не передали
+	hostPort := newPort
+	if hostPort == 0 {
+		pb := get("{{json .NetworkSettings.Ports}}", name)
+		if pb != "" {
+			var ports map[string][]struct{ HostPort string `json:"HostPort"` }
+			if json.Unmarshal([]byte(pb), &ports) == nil {
+				for _, arr := range ports {
+					if len(arr) > 0 { fmt.Sscanf(arr[0].HostPort, "%d", &hostPort); break }
+				}
+			}
+		}
+		if hostPort == 0 { hostPort = 8080 }
+	}
+	if hostIP == "" { hostIP = "0.0.0.0" }
+
+	_ = typ
+	if len(binds) == 0 {
+		// не смогли найти bind — откат к стандартному nginx корню
+		binds = append(binds, mountInfo{Src: "", Dst: "/usr/share/nginx/html", RW: false})
+		return fmt.Errorf("не удалось определить каталог-источник контейнера")
+	}
+	// на всякий: если не передали папку, сохраняем существующую
+	for i := range binds {
+		if binds[i].Src == "" {
+			return fmt.Errorf("не удалось определить каталог-источник контейнера")
+		}
+	}
+
+	// 2. удаляем старый
+	exec.CommandContext(ctx, "docker", "rm", "-f", name).Run()
+
+	// 3. пересоздаём
+	args := []string{"run", "-d", "--name", name, "--restart", "unless-stopped"}
+	args = append(args, "-p", fmt.Sprintf("%s:%d:%s", hostIP, hostPort, innerPort))
+	for _, b := range binds {
+		roSuffix := ""
+		if !b.RW { roSuffix = ":ro" }
+		args = append(args, "-v", b.Src+":"+b.Dst+roSuffix)
+	}
+	args = append(args, image)
+
+	out, err := exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("не удалось пересоздать: %s: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func jsonResp(w http.ResponseWriter, v interface{}) {

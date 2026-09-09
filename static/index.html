@@ -168,6 +168,16 @@ nav{padding:10px 0;border-bottom:1px solid var(--br1)}
   <div class="fa"><button class="b" onclick="hideModal('mEditRunner')">Cancel</button><button class="b b-p" onclick="saveRunnerEdit()">Save & Restart</button></div>
 </div></div>
 
+<div class="mbg" id="mEditSite" onclick="if(event.target===this)hideModal('mEditSite')"><div class="md">
+  <h2>Edit: <span id="esName"></span></h2>
+  <input type="hidden" id="esC">
+  <div class="fg"><label>Host / port (внешний, который слушает контейнер)</label><input id="esPort" type="number" placeholder="e.g. 8090"></div>
+  <div class="fg"><label>Bind IP (<code>0.0.0.0</code> = доступен наружу, <code>127.0.0.1</code> = только локально)</label><input id="esIP" placeholder="0.0.0.0"></div>
+  <div class="fg"><label>Папка исходников на диске (host path, папка контента сайта)</label><input id="esPath" placeholder="/var/www/name"></div>
+  <div style="font-size:11px;color:var(--t2);margin-top:8px">Порт вне изменения контейнера. После сохранения контейнер пересоздаётся с новыми параметрами.</div>
+  <div class="fa"><button class="b" onclick="hideModal('mEditSite')">Cancel</button><button class="b b-p" onclick="saveEditSite()">Save & Recreate</button></div>
+</div></div>
+
 <div class="lbg" id="mLog" onclick="if(event.target===this)hideModal('mLog')"><div class="lb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <span style="font-weight:600;font-size:13px" id="logTitle">Logs</span>
@@ -239,7 +249,7 @@ function loadContainers(){
       var tags=x.managed?'<span class="tag">managed</span>':'';
       var portStr=x.ports?'<div class="cv">'+e(x.ports)+'</div>':'';
       var n=esc(x.name);
-      return'<div class="c" style="border-left:3px solid '+(up?'var(--t1)':'var(--br2)')+'"><div class="cn">'+e(x.name)+tags+'</div><div class="cm" title="'+e(x.image)+'">'+e(x.image)+'</div>'+portStr+statusBadge(st)+'<div class="ca"><button class="b" onclick="doExec(\''+n+'\')">exec</button><button class="b" onclick="doLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doInspect(\''+n+'\',\''+e(x.name)+'\')">info</button>'+(up?'<button class="b b-y" onclick="doAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doAction(\''+n+'\',\'stop\')">stop</button>':'<button class="b b-g" onclick="doAction(\''+n+'\',\'start\')">start</button>')+'<button class="b b-r" onclick="doRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>';
+      return'<div class="c" style="border-left:3px solid '+(up?'var(--t1)':'var(--br2)')+'"><div class="cn">'+e(x.name)+tags+'</div><div class="cm" title="'+e(x.image)+'">'+e(x.image)+'</div>'+portStr+statusBadge(st)+'<div class="ca"><button class="b" onclick="doExec(\''+n+'\')">exec</button><button class="b" onclick="doLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button><button class="b" onclick="doInspect(\''+n+'\',\''+e(x.name)+'\')">info</button>'+(x.managed?'<button class="b" onclick="openEdit(\''+n+'\',\''+e(x.name)+'\',\''+(x.ports||'')+'\')">edit</button>':'')+'+(up?'<button class="b b-y" onclick="doAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doAction(\''+n+'\',\'stop\')">stop</button>':'<button class="b b-g" onclick="doAction(\''+n+'\',\'start\')">start</button>')+'<button class="b b-r" onclick="doRemove(\''+n+'\',\''+e(x.name)+'\')">rm</button></div></div>';
     }).join('');
   }).catch(function(er){$('containers').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
@@ -247,6 +257,18 @@ function doLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/
 function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')})}
 function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){setTimeout(loadContainers,1000)})}
 function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){setTimeout(loadContainers,1000)})}
+function openEdit(n,name,portsStr){
+  $('esName').textContent=name;$('esC').value=n;
+  // попытаться угадать текущий host port из "8080/tcp->8080" строки
+  var portGuess='';var m=portsStr.match(/->(\d+)/);if(m)portGuess=m[1];
+  $('esPort').value=portGuess;$('esIP').value='0.0.0.0';
+  $('esPath').value='/var/www/'+name;
+  showModal('mEditSite');
+}
+function saveEditSite(){
+  var n=$('esC').value,port=parseInt($('esPort').value)||0,hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';
+  api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');setTimeout(loadContainers,1500)}).catch(function(er){alert('Error: '+e(String(er)))});
+}
 function doExec(n){$('execName').textContent=unescape(decodeURIComponent(n));$('execCmd').value='';$('execOut').textContent='';$('execOut').classList.remove('on');showModal('mExec');setTimeout(function(){$('execCmd').focus()},100)}
 function runExec(){var n=esc($('execName').textContent),cmd=$('execCmd').value;if(!cmd)return;var out=$('execOut');out.classList.add('on');out.textContent='Running: '+cmd+'\n';fetch('/api/v1/containers/'+n+'/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({cmd:cmd})}).then(function(r){return r.text()}).then(function(t){out.textContent+=t}).catch(function(er){out.textContent+='Error: '+er})}
 function addSite(){var n=$('fN').value;if(!n)return alert('Name required');api('POST','/api/v1/sites',{name:n,dir:$('fD').value||'/var/www/'+n,port:parseInt($('fP').value)||0,type:$('fT').value}).then(function(){hideModal('mAdd');setTimeout(loadContainers,3000)}).catch(function(er){alert(e(String(er)))})}

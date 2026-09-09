@@ -21,8 +21,43 @@ var templates = map[string]string{
 
 var defaultPorts = map[string]int{"static": 8080, "php": 9000, "python": 8000, "node": 3000, "go": 8080}
 
-func stackDir() string   { ex, _ := os.Executable(); return filepath.Dir(ex) }
-func composePath() string { return filepath.Join(stackDir(), "docker-compose.yml") }
+// deployHome — рабочий каталог менеджера: где живут docker-compose.yml, data/,
+// templates/, static/. Менеджер можно запускать и как процесс на хосте (системд),
+// и в контейнере-менеджере. По умолчанию: каталог исполняемого файла (системд на
+// хосте => /root/deploy-stack). В контейнере задаётся переменной DEPLOY_HOME.
+func deployHome() string {
+	if h := os.Getenv("DEPLOY_HOME"); h != "" {
+		return filepath.Clean(h)
+	}
+	return filepath.Clean(filepath.Dir(os.Args[0]))
+}
+func composePath() string   { return filepath.Join(deployHome(), "docker-compose.yml") }
+
+// templatesSearch returns candidate host dirs with Dockerfile/nginx-шаблонов.
+func templatesSearch() []string {
+	return []string{
+		filepath.Join(deployHome(), "templates"),
+		"/usr/local/share/deploy-stack/templates",
+		filepath.Join(filepath.Dir(os.Args[0]), "templates"),
+	}
+}
+// resolveTemplates picks 1-ю существующую templates-папку, иначе дефолт в DEPLOY_HOME.
+func resolveTemplatesDir() string {
+	for _, d := range templatesSearch() {
+		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
+			return d
+		}
+	}
+	return templatesSearch()[0]
+}
+
+// runnerDataRoot — корень данных Forgejo-runner'ов (config.yaml/.runner).
+func runnerDataRoot() string {
+	if h := os.Getenv("RUNNER_DATA"); h != "" {
+		return filepath.Clean(h)
+	}
+	return "/root/forgejo-runner"
+}
 
 func prompt(msg string) string {
 	fmt.Print(msg)
@@ -426,7 +461,7 @@ func defaultCompose() string {
 }
 
 func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
-	tmpl := filepath.Join(stackDir(), "templates", lang.Template)
+	tmpl := filepath.Join(resolveTemplatesDir(), lang.Template)
 	safeName := strings.ToLower(name)
 
 	// Check if project has its own Dockerfile

@@ -2,3 +2,4 @@ dist/
 deploy.exe
 *.exe
 .env
+/deploy

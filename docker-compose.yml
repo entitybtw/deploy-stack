@@ -1,33 +1,68 @@
+# deploy-stack — единый стек: панель-менеджер + Forgejo runner.
+# Поднимается:  docker compose up -d
+# Панель:       http://localhost:3000   (login admin/admin, см. .env)
+#
+# Как это работает:
+#  - deploy-stack (контейнер-менеджер) общается с Docker демоном ХОСТА через /var/run/docker.sock,
+#    поэтому он видит и управляет контейнерами сайтов, которые сам же порождает на этом хосте.
+#  - Состояние (docker-compose.yml + data/) хранится в томе на ХОСТЕ: ./deploy-data
+#  - Код сайтов кладите в папку ./www (монтируется в /var/www и внутрь контейнеров раннера/сайта)
+#
+# Требуется: Linux-хост с Docker Engine (>=20). Внутри имеет собственную ОС-агент.
+
 services:
-  web:
+  # ── Панель-менеджер ──
+  deploy-stack:
     build: .
-    container_name: deploy-web
+    image: deploy-stack:latest
+    container_name: deploy-stack
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-3000}:3000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/www:/var/www
-      - deploy-data:/data
     environment:
-      - DEPLOY_ADMIN_USER=${DEPLOY_ADMIN_USER:-admin}
-      - DEPLOY_ADMIN_PASS=${DEPLOY_ADMIN_PASS:-admin}
+      DEPLOY_HOME: /deploy
+      RUNNER_DATA: /runner
+      DEPLOY_ADMIN_USER: ${DEPLOY_ADMIN_USER:-admin}
+      DEPLOY_ADMIN_PASS: ${DEPLOY_ADMIN_PASS:-admin}
+      DEPLOY_GIT_URL: ${DEPLOY_GIT_URL:-http://git.example.com:3000}
+      DEPLOY_RUNNER_REGTOKEN: ${DEPLOY_RUNNER_REGTOKEN:-}
+    volumes:
+      # доступ к демону хоста — менеджер порождает контейнеры сайтов НА ХОСТЕ
+      - /var/run/docker.sock:/var/run/docker.sock
+      # код сайтов (общий и для раннера, и для контейнеров сайтов, что поднимутся на хосте)
+      - ./www:/var/www
+      # рабочее состояние менеджера ВЫНОСИМ НА ХОСТ, чтобы панель не теряла stack при ребуилде
+      - ./deploy-data:/deploy
+    labels:
+      - "deploy-stack.role=panel"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/v1/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
+  # ── CI/CD раннер (необязателен, нужен только если используешь Forgejo/Gitea Actions) ──
   runner:
     image: data.forgejo.org/forgejo/runner:4.0.0
-    container_name: runner
+    container_name: deploy-stack-runner
     user: root
     restart: unless-stopped
     volumes:
-      - /root/forgejo-runner/data:/data
+      - ./runner:/data
       - /var/run/docker.sock:/var/run/docker.sock
-      - /var/www:/var/www
-      - /root/deploy-stack:/root/deploy-stack
+      - ./www:/var/www
+    environment:
+      FORGEJO_RUNNER_REGISTRATION_TOKEN: ${DEPLOY_RUNNER_REGTOKEN:-}
+      FORGEJO_URL: ${DEPLOY_GIT_URL:-}
     command: >
       sh -c "sleep 10 &&
              apk update && apk add --no-cache nodejs npm rsync &&
-             ln -sf /root/deploy-stack/deploy /usr/local/bin/deploy &&
-             forgejo-runner daemon --config /data/config.yaml"
+             forgejo-runner register --no-interactive \
+               --instance '${DEPLOY_GIT_URL:-http://git.example.com:3000}' \
+               --token '${DEPLOY_RUNNER_REGTOKEN:-}' \
+               --name 'host-runner' --labels 'host:host' --connect 2>/dev/null || true;
+             forgejo-runner daemon --config /data/.runner"
+    profiles: ["ci"]
 
 volumes:
-  deploy-data:
+  # named volume не нужен — используем ./deploy-data и ./www на хосте для удобства.

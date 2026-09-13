@@ -255,6 +255,10 @@ func startWebServer(port int) {
 				Type string `json:"type"`
 			}
 			jsonDec(r, &req)
+			if req.Name == "" {
+				jsonErr(w, "name required", 400)
+				return
+			}
 			if req.Dir == "" {
 				req.Dir = "/var/www/" + req.Name
 			}
@@ -265,16 +269,12 @@ func startWebServer(port int) {
 			if req.Port == 0 {
 				req.Port = freePort(lang.Port)
 			}
-			c := readCompose()
-			c = removeService(c, req.Name)
-			c = insertService(c, buildServiceBlock(req.Name, req.Dir, req.Port, lang))
-			writeCompose(c)
-			svc := req.Name
-			if lang.Name == "php" {
-				svc = req.Name + "-php"
+			actual, err := deploySite(req.Name, req.Dir, req.Port, lang)
+			if err != nil {
+				jsonErr(w, err.Error(), 400)
+				return
 			}
-			dockerCompose("up", "-d", "--build", svc)
-			json.NewEncoder(w).Encode(map[string]string{"status": "deployed", "name": req.Name})
+			json.NewEncoder(w).Encode(map[string]interface{}{"status": "deployed", "name": req.Name, "port": actual})
 		}
 	}))
 
@@ -353,8 +353,8 @@ func startWebServer(port int) {
 		}
 		if req.Capacity == 0 { req.Capacity = 1 }
 		if req.Platform == "" { req.Platform = "forgejo" }
+		if req.URL == "" { req.URL = "http://10.0.0.1:3000" }
 		addRunner(req.Name, req.Token, req.URL)
-		dockerCompose("up", "-d", req.Name)
 		jsonResp(w, map[string]string{"status": "created", "name": req.Name})
 	}))
 
@@ -443,8 +443,49 @@ func startWebServer(port int) {
 			"containers": len(listContainers(false)),
 			"sites":      listServices(),
 			"runners":    runnerNames(),
-			"version":    "1.3.0",
+			"version":    "1.4.0",
 		})
+	}))
+
+	// ── One-shot auto deploy (имя/каталог/порт/тип можно не указывать) ──
+	mux.HandleFunc("/api/v1/deploy", authReq(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			jsonErr(w, "POST required", 405)
+			return
+		}
+		var req struct {
+			Name string `json:"name"`
+			Dir  string `json:"dir"`
+			Port int    `json:"port"`
+			Type string `json:"type"`
+		}
+		jsonDec(r, &req)
+		dir := req.Dir
+		if dir == "" {
+			if req.Name != "" {
+				dir = "/var/www/" + req.Name
+			} else {
+				jsonErr(w, "name or dir required", 400)
+				return
+			}
+		}
+		lang := detectLang(dir)
+		if req.Type != "" {
+			lang = LangInfo{req.Type, req.Type, defaultPorts[req.Type], nil}
+		}
+		name := req.Name
+		if name == "" {
+			name = filepath.Base(dir)
+		}
+		if req.Port == 0 {
+			req.Port = freePort(lang.Port)
+		}
+		actual, err := deploySite(name, dir, req.Port, lang)
+		if err != nil {
+			jsonErr(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"status": "deployed", "name": name, "port": actual, "type": lang.Name})
 	}))
 
 	// ── Docs ──
@@ -462,7 +503,7 @@ func startWebServer(port int) {
 	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	log.Printf("deploy-stack v1.3.0 on :%d", port)
+	log.Printf("deploy-stack v1.4.0 on :%d", port)
 	log.Printf("Web:  http://localhost:%d", port)
 	log.Printf("API:  http://localhost:%d/api/v1/", port)
 	log.Fatal(http.ListenAndServe(addr, mux))
@@ -522,6 +563,7 @@ func listContainers(showAll bool) []map[string]interface{} {
 	containers := make([]map[string]interface{}, 0)
 	infra := map[string]bool{
 		"runner": true, "docker_dind": true, "deploy-web": true,
+		"deploy-stack": true, "deploy-stack-runner": true,
 	}
 
 	// Batch: get all container names and statuses
@@ -559,22 +601,23 @@ func listContainers(showAll bool) []map[string]interface{} {
 		all = append(all, rawContainer{Name: name, Status: status, Image: image})
 	}
 
-	// Batch mount check: docker inspect all names
+	// Batch: determine managed containers (label deploy-stack.site или mount /var/www)
 	if !showAll && len(all) > 0 {
 		names := make([]string, len(all))
 		for i, c := range all { names[i] = c.Name }
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel2()
-		// Build a format that outputs name|mounts for each
-		inspectCmd := exec.CommandContext(ctx2, "docker", "inspect", "--format", "{{.Name}}|{{range .Mounts}}{{.Source}}:{{.Destination}}|{{end}}")
+		inspectCmd := exec.CommandContext(ctx2, "docker", "inspect", "--format",
+			`{{.Name}}|{{index .Config.Labels "deploy-stack.site"}}|{{range .Mounts}}{{.Source}}:{{.Destination}}|{{end}}`)
 		inspectCmd.Args = append(inspectCmd.Args, names...)
 		mountOut, _ = inspectCmd.CombinedOutput()
 		for _, line := range strings.Split(strings.TrimSpace(string(mountOut)), "\n") {
-			parts := strings.SplitN(line, "|", 2)
-			if len(parts) < 2 { continue }
+			parts := strings.SplitN(line, "|", 3)
+			if len(parts) < 3 { continue }
 			name := strings.TrimPrefix(parts[0], "/")
-			mounts := parts[1]
-			if strings.Contains(mounts, "/var/www") {
+			label := strings.TrimSpace(parts[1])
+			mounts := parts[2]
+			if label != "" || strings.Contains(mounts, "/var/www") {
 				mountMap[name] = true
 			}
 		}

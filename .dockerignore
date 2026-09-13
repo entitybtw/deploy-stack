@@ -1,0 +1,14 @@
+# .dockerignore — не тащим на сервер лишнее
+.git
+.github
+.forgejo
+deploy-data/
+www/
+runner/
+sites/
+runners/
+*.log
+deploy
+deploy.exe
+dist/
+.env

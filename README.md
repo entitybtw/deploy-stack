@@ -2,16 +2,33 @@
 
 Universal Docker deployment platform with web UI, API, cluster management, and Forgejo CI/CD runners.
 
+**Zero-config деплой:** в репозитории достаточно указать label раннера (`runs-on`) и порт —
+`deploy-stack` сам определит язык, соберёт контейнер и поднимет сайт.
+
+```yaml
+name: Deploy
+on: { push: { branches: [main] } }
+jobs:
+  deploy:
+    runs-on: web        # label раннера (node-web)
+    env: { PORT: 8084 }      # внешний порт сайта
+    steps:
+      - uses: actions/checkout@v4
+      - run: deploy
+```
+
 ## Features
 
+- **Zero-config deploy** — `deploy` в CI: имя из репозитория, язык авто, порт из `PORT`/`.deploy`
 - **Containers** — list, exec, logs, inspect, start/stop/restart/remove
 - **Cluster** — карточки серверов + «manage» открывает полноценный менеджер ноды
   (вкладки Containers / Runners / System, действия exec·logs·start·stop·restart·rm)
 - **Runners** — Forgejo/Gitea/GitHub runner management with labels, logs, edit
 - **Settings** — accent color, themes (dark/light/black), show/hide all containers
 - **Auto-detection** — PHP, Python, Node.js, Go, Rust, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, Bun, Deno
-- **CLI** — `deploy add/rm/list/serve/add-runner/rm-runner`
+- **CLI** — `deploy` (auto) / `add` / `rm` / `list` / `logs` / `restart` / `serve` / `add-runner`
 - **Webhook** — auto-deploy on push via Forgejo/Gitea webhooks
+
 
 ## Architecture
 
@@ -67,9 +84,19 @@ docker compose up -d
 ```bash
 git clone https://git.example.com/example/deploy-stack.git
 cd deploy-stack
-cp .env.example .env        # задай DEPLOY_ADMIN_PASS (и токен раннера — опц.)
-docker compose up -d        # панель on :3000 (+ раннер при DEPLOY_RUNNER_REGTOKEN)
+./install.sh              # сгенерирует .env со случайным паролем и запустит стек
+# или вручную:
+cp .env.example .env      # задай DEPLOY_ADMIN_PASS
+docker compose up -d --build
+# панель на :3000, раннер подключается при непустом DEPLOY_RUNNER_REGTOKEN
 ```
+
+> **IPv6:** если у хоста сломан IPv6, `docker build` может «висеть» на `apk update`.
+> Собирай через `docker build --network=host -t deploy-stack:latest .`
+> или добавь в `/etc/docker/daemon.json`:
+> ```json
+> { "dns": ["1.1.1.1", "8.8.8.8"], "ipv6": false }
+> ```
 
 Панель можно запускать и как системный сервис на хосте (без контейнера) — тогда она
 управляет локальным демоном напрямую; оба способа дают один и тот же API/UI.
@@ -89,17 +116,31 @@ DEPLOY_ADMIN_PASS=your-password /root/deploy-stack/deploy serve --port 9090
 ## CLI Usage
 
 ```bash
-deploy                                  # Interactive mode
-deploy add <name> <dir> [--port N]      # Add site (auto-detect language)
-deploy rm <name>                        # Remove site
-deploy list                             # List all sites
-deploy runners                          # List all runners
-deploy add-runner <name> <token>        # Add Forgejo runner
-deploy rm-runner [name]                 # Remove runner(s)
-deploy status                           # Show containers
-deploy up / down                        # Start/stop all
-deploy serve --port 9090                # Start web server
+deploy                                  # Авто-деплой текущего репо (CI) / интерактивно
+deploy --port 8084 [--name N --type T]  # Авто-деплой с явными параметрами
+deploy add <name> <dir> [--port N]      # Добавить сайт (авто-определение языка)
+deploy rm <name>                        # Удалить сайт
+deploy list                             # Список сайтов: порт + статус
+deploy logs <name> [--tail N]           # Логи сайта
+deploy restart <name>                   # Перезапустить сайт
+deploy runners                          # Список раннеров
+deploy add-runner <name> <token>        # Добавить Forgejo runner
+deploy rm-runner [name]                 # Удалить раннер(ы)
+deploy status                           # Контейнеры сайтов
+deploy up / down                        # Поднять/остановить всё
+deploy serve --port 3000                # Панель-менеджер (web UI + API)
 ```
+
+### Файл `.deploy` (опционально)
+
+Положите в корень репозитория — тогда в workflow достаточно `runs-on`:
+
+```
+NAME=my-site
+PORT=8084
+TYPE=static      # static | php | python | node | go
+```
+
 
 ## API
 
@@ -169,53 +210,45 @@ on:
     branches: [main]
 jobs:
   deploy:
-    runs-on: web  # matches runner with label "web"
+    runs-on: web            # label раннера
+    env:
+      PORT: 8084                 # внешний порт сайта
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy
-        run: |
-          rsync -a --delete --exclude='.git' ./ /var/www/my-site/
-          deploy add my-site /var/www/my-site --port 8080
+      - run: deploy              # язык определится сам
 ```
+
+Для PHP-сайтов, которым нужен свой web-сервер, укажите `TYPE: php`
+(шаблон поднимает nginx + php-fpm в одном контейнере) или положите
+свой `Dockerfile` — deploy-stack использует его автоматически.
 
 ## Forgejo Runner Setup
 
 ### Prerequisites
 
 - Forgejo instance with Actions enabled
-- Runner token from Forgejo admin panel
+- Runner token from Forgejo admin panel (Site Administration → Actions → Runners)
 
-### Register runner
+### Register runner (одной командой)
 
 ```bash
-# On the target host
-mkdir -p /root/forgejo-runner/data
-# Download act_runner binary
-# Register with token:
-./act_runner register --config /root/forgejo-runner/data/config.yaml
+cd /root/deploy-stack
+./deploy add-runner web <REGISTRATION_TOKEN> --url http://git.example.com:3000
 ```
 
-### Runner docker-compose (deploy-stack)
+Раннер сам поднимется в контейнере, установит docker-cli/rsync/node, слинкует
+`deploy` и запустится с указанными label'ами. Для каждого сервера — свой label:
 
-The runner is included in `docker-compose.yml`:
+| Сервер | Label |
+|--------|-------|
+| node-4 | `my-site:host` |
+| node-web | `web:host` |
+| node-app | `worker:host` |
 
-```yaml
-runner:
-  image: data.forgejo.org/forgejo/runner:4.0.0
-  container_name: runner
-  user: root
-  restart: unless-stopped
-  volumes:
-    - /root/forgejo-runner/data:/data
-    - /var/run/docker.sock:/var/run/docker.sock
-    - /var/www:/var/www
-    - /root/deploy-stack:/root/deploy-stack
-  command: >
-    sh -c "sleep 10 &&
-           apk update && apk add --no-cache nodejs npm rsync &&
-           ln -sf /root/deploy-stack/deploy /usr/local/bin/deploy &&
-           forgejo-runner daemon --config /data/config.yaml"
-```
+### Runner docker-compose
+
+Раннер включён в `docker-compose.yml` (профиль `ci`): он монтирует
+`/var/run/docker.sock`, `./www` и `./deploy-data` (ради бинаря `deploy`).
 
 ## Cluster Management
 
@@ -234,18 +267,19 @@ The panel shows all containers and runners on the remote server with exec, logs,
 ```bash
 cd /root/deploy-stack
 git pull
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy .
-pkill -9 -f "deploy serve"
-nohup /root/deploy-stack/deploy serve --port 9090 >/dev/null 2>&1 &
+# если панель запущена через docker compose:
+docker compose up -d --build
+# если как systemd-сервис на хосте:
+CGO_ENABLED=0 go build -ldflags="-s -w" -o deploy . && systemctl restart deploy-stack
 ```
 
 ## Supported Languages (auto-detected)
 
-| Language | Dockerfile | Default Port |
-|----------|------------|--------------|
-| Static HTML | nginx:alpine | 8080 |
-| PHP 8.2 | php:8.2-fpm-alpine | 9000 |
-| Python 3.12 | python:3.12-alpine | 8000 |
+| Language | Dockerfile | Внутренний порт |
+|----------|------------|------------------|
+| Static HTML | nginx:alpine | 80 |
+| PHP 8.2 | nginx + php-fpm (в одном контейнере) | 80 |
+| Python 3.12 / Django / Flask / FastAPI | python:3.12-alpine | 8000 |
 | Node.js 20 | node:20-alpine | 3000 |
 | Bun | oven/bun:alpine | 3000 |
 | Deno | denoland/deno:alpine | 8000 |

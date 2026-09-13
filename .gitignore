@@ -1,5 +1,12 @@
 dist/
+deploy
 deploy.exe
 *.exe
 .env
-/deploy
+# локальные данные панели/сайтов
+deploy-data/
+www/
+runner/
+sites/
+runners/
+data/

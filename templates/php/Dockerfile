@@ -1,5 +1,49 @@
 FROM php:8.2-fpm-alpine
-RUN apk add --no-cache sqlite curl-dev oniguruma-dev
-RUN docker-php-ext-install curl mbstring opcache
-RUN printf '[www]\nuser = www-data\ngroup = www-data\nlisten = 0.0.0.0:9000\npm = dynamic\npm.max_children = 3\npm.start_servers = 1\npm.min_spare_servers = 1\npm.max_spare_servers = 2\n' > /usr/local/etc/php-fpm.d/zz-custom.conf
-WORKDIR /var/www
+
+# nginx + sqlite CLI (миграции) + инструменты
+RUN apk add --no-cache nginx sqlite curl-dev oniguruma-dev libpng-dev libzip-dev
+RUN docker-php-ext-install curl mbstring opcache pdo_sqlite gd
+
+# конфиг nginx: корень сайта, PHP-FPM, защита секретов
+RUN printf '%s\n' \
+  'server {' \
+  '    listen 80;' \
+  '    server_name _;' \
+  '    root /var/www/html;' \
+  '    index index.php index.html;' \
+  '    client_max_body_size 512M;' \
+  '' \
+  '    location ~ /\.(?!well-known) { deny all; }' \
+  '    location ~* \.(db|sqlite|sqlite3|env|log|bak|old|orig|swp|save|tmp|sql)(-wal|-shm|-journal)?$ { deny all; }' \
+  '    location ~ /(install|panel/data)/ { deny all; }' \
+  '    location / { try_files $uri $uri/ /index.php?$query_string; }' \
+  '    location ~ \.php(/|$) {' \
+  '        fastcgi_split_path_info ^(.+\.php)(/.+)$;' \
+  '        try_files $fastcgi_script_name =404;' \
+  '        fastcgi_pass 127.0.0.1:9000;' \
+  '        fastcgi_index index.php;' \
+  '        include fastcgi_params;' \
+  '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' \
+  '        fastcgi_param PATH_INFO $fastcgi_path_info;' \
+  '        fastcgi_buffering off;' \
+  '    }' \
+  '}' \
+  > /etc/nginx/http.d/default.conf
+
+# php-fpm слушает localhost, отдаёт www-data
+RUN printf '%s\n' \
+  '[www]' \
+  'user = www-data' \
+  'group = www-data' \
+  'listen = 127.0.0.1:9000' \
+  'pm = dynamic' \
+  'pm.max_children = 10' \
+  'pm.start_servers = 2' \
+  'pm.min_spare_servers = 1' \
+  'pm.max_spare_servers = 4' \
+  > /usr/local/etc/php-fpm.d/zz-deploy.conf
+
+WORKDIR /var/www/html
+
+# nginx на переднем плане + php-fpm, оба в одном контейнере
+CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]

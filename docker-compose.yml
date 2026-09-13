@@ -1,14 +1,20 @@
-# deploy-stack — единый стек: панель-менеджер + Forgejo runner.
-# Поднимается:  docker compose up -d
-# Панель:       http://localhost:3000   (login admin/admin, см. .env)
+# deploy-stack — единый стек: панель-менеджер + Forgejo CI/CD runner.
+#
+#   cd /root/deploy-stack
+#   cp .env.example .env      # или сгенерируй install.sh (рандомный пароль)
+#   docker compose up -d --build
+#
+# Панель:   http://HOST:${WEB_PORT}
+# Логин:    ${DEPLOY_ADMIN_USER} / ${DEPLOY_ADMIN_PASS}
 #
 # Как это работает:
-#  - deploy-stack (контейнер-менеджер) общается с Docker демоном ХОСТА через /var/run/docker.sock,
-#    поэтому он видит и управляет контейнерами сайтов, которые сам же порождает на этом хосте.
-#  - Состояние (docker-compose.yml + data/) хранится в томе на ХОСТЕ: ./deploy-data
-#  - Код сайтов кладите в папку ./www (монтируется в /var/www и внутрь контейнеров раннера/сайта)
+#  - deploy-stack (контейнер-менеджер) общается с Docker-демоном ХОСТА через
+#    /var/run/docker.sock и управляет контейнерами сайтов, которые сам порождает.
+#  - Состояние (data/, sites/, runners/) живёт на ХОСТЕ в ./deploy-data,
+#    поэтому панель не теряет стек при пересборке.
+#  - Код сайтов — в ./www (монтируется в /var/www и внутрь раннера/сайтов).
 #
-# Требуется: Linux-хост с Docker Engine (>=20). Внутри имеет собственную ОС-агент.
+# Требуется Linux-хост с Docker Engine (>=20).
 
 services:
   # ── Панель-менеджер ──
@@ -21,17 +27,16 @@ services:
       - "${WEB_PORT:-3000}:3000"
     environment:
       DEPLOY_HOME: /deploy
+      DEPLOY_SITES: /deploy/sites/docker-compose.yml
+      DEPLOY_RUNNERS: /deploy/runners/docker-compose.yml
       RUNNER_DATA: /runner
       DEPLOY_ADMIN_USER: ${DEPLOY_ADMIN_USER:-admin}
       DEPLOY_ADMIN_PASS: ${DEPLOY_ADMIN_PASS:-admin}
-      DEPLOY_GIT_URL: ${DEPLOY_GIT_URL:-http://git.example.com:3000}
+      DEPLOY_GIT_URL: ${DEPLOY_GIT_URL:-http://git.example.com:3006}
       DEPLOY_RUNNER_REGTOKEN: ${DEPLOY_RUNNER_REGTOKEN:-}
     volumes:
-      # доступ к демону хоста — менеджер порождает контейнеры сайтов НА ХОСТЕ
       - /var/run/docker.sock:/var/run/docker.sock
-      # код сайтов (общий и для раннера, и для контейнеров сайтов, что поднимутся на хосте)
       - ./www:/var/www
-      # рабочее состояние менеджера ВЫНОСИМ НА ХОСТ, чтобы панель не теряла stack при ребуилде
       - ./deploy-data:/deploy
     labels:
       - "deploy-stack.role=panel"
@@ -41,28 +46,27 @@ services:
       timeout: 5s
       retries: 3
 
-  # ── CI/CD раннер (необязателен, нужен только если используешь Forgejo/Gitea Actions) ──
+  # ── CI/CD раннер (host-исполнитель: деплоит прямо на этом хосте) ──
+  # Нужен только если используешь Forgejo/Gitea Actions.
+  # Токен: админка Forgejo -> Runners. Можно оставить пустым и не включать.
   runner:
     image: data.forgejo.org/forgejo/runner:4.0.0
     container_name: deploy-stack-runner
     user: root
     restart: unless-stopped
+    depends_on:
+      - deploy-stack
     volumes:
       - ./runner:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - ./www:/var/www
+      # менеджер целиком — ради бинаря deploy и шаблонов
+      - ./deploy-data:/deploy
     environment:
-      FORGEJO_RUNNER_REGISTRATION_TOKEN: ${DEPLOY_RUNNER_REGTOKEN:-}
-      FORGEJO_URL: ${DEPLOY_GIT_URL:-}
+      DEPLOY_HOME: /deploy
+      DEPLOY_SITES: /deploy/sites/docker-compose.yml
     command: >
-      sh -c "sleep 10 &&
-             apk update && apk add --no-cache nodejs npm rsync &&
-             forgejo-runner register --no-interactive \
-               --instance '${DEPLOY_GIT_URL:-http://git.example.com:3000}' \
-               --token '${DEPLOY_RUNNER_REGTOKEN:-}' \
-               --name 'host-runner' --labels 'host:host' --connect 2>/dev/null || true;
-             forgejo-runner daemon --config /data/.runner"
+      sh -c "apk update && apk add --no-cache docker-cli docker-cli-compose rsync nodejs npm &&
+             ln -sf /deploy/deploy /usr/local/bin/deploy &&
+             forgejo-runner daemon --config /data/config.yaml"
     profiles: ["ci"]
-
-volumes:
-  # named volume не нужен — используем ./deploy-data и ./www на хосте для удобства.

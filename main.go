@@ -356,7 +356,8 @@ func insertService(content, block string) string {
 	}
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
-		if strings.TrimSpace(line) == "volumes:" && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+		trimmed := strings.TrimSpace(line)
+		if (trimmed == "volumes:" || trimmed == "volumes: {}") && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
 			return strings.Join(lines[:i], "\n") + "\n" + block + "\n" + strings.Join(lines[i:], "\n")
 		}
 	}

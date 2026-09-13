@@ -13,25 +13,43 @@ import (
 
 var templates = map[string]string{
 	"static": "Static HTML/CSS/JS (nginx)",
-	"php":    "PHP 8.2 (php-fpm)",
+	"php":    "PHP 8.2 (nginx + php-fpm)",
 	"python": "Python 3.12 (gunicorn)",
 	"node":   "Node.js 20",
 	"go":     "Go (compiled binary)",
 }
 
-var defaultPorts = map[string]int{"static": 8080, "php": 9000, "python": 8000, "node": 3000, "go": 8080}
+var defaultPorts = map[string]int{"static": 8080, "php": 8080, "python": 8000, "node": 3000, "go": 8080}
 
-// deployHome — рабочий каталог менеджера: где живут docker-compose.yml, data/,
-// templates/, static/. Менеджер можно запускать и как процесс на хосте (системд),
-// и в контейнере-менеджере. По умолчанию: каталог исполняемого файла (системд на
-// хосте => /root/deploy-stack). В контейнере задаётся переменной DEPLOY_HOME.
+// ═══════════════════════════════════════════
+//  Paths
+// ═══════════════════════════════════════════
+
+// deployHome — рабочий каталог менеджера: где живут sites/, templates/, static/.
+// По умолчанию — каталог исполняемого файла (системд/раннер: /root/deploy-stack),
+// в контейнере задаётся переменной DEPLOY_HOME.
 func deployHome() string {
 	if h := os.Getenv("DEPLOY_HOME"); h != "" {
 		return filepath.Clean(h)
 	}
 	return filepath.Clean(filepath.Dir(os.Args[0]))
 }
-func composePath() string   { return filepath.Join(deployHome(), "docker-compose.yml") }
+
+// composePath — файл, в котором живут сервисы сайтов (отдельно от стека панели).
+func composePath() string {
+	if p := os.Getenv("DEPLOY_SITES"); p != "" {
+		return filepath.Clean(p)
+	}
+	return filepath.Join(deployHome(), "sites", "docker-compose.yml")
+}
+
+// runnersComposePath — файл, в котором живут сервисы CI-раннеров.
+func runnersComposePath() string {
+	if p := os.Getenv("DEPLOY_RUNNERS"); p != "" {
+		return filepath.Clean(p)
+	}
+	return filepath.Join(deployHome(), "runners", "docker-compose.yml")
+}
 
 // templatesSearch returns candidate host dirs with Dockerfile/nginx-шаблонов.
 func templatesSearch() []string {
@@ -41,7 +59,8 @@ func templatesSearch() []string {
 		filepath.Join(filepath.Dir(os.Args[0]), "templates"),
 	}
 }
-// resolveTemplates picks 1-ю существующую templates-папку, иначе дефолт в DEPLOY_HOME.
+
+// resolveTemplatesDir picks 1-ю существующую templates-папку, иначе дефолт в DEPLOY_HOME.
 func resolveTemplatesDir() string {
 	for _, d := range templatesSearch() {
 		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
@@ -66,24 +85,71 @@ func prompt(msg string) string {
 	return strings.TrimSpace(s.Text())
 }
 
+func isCI() bool {
+	return os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("DEPLOY_AUTO") != ""
+}
+
+func isTTY() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
 // ═══════════════════════════════════════════
 //  Port management
 // ═══════════════════════════════════════════
 
-func usedPorts() map[int]bool {
+// dockerHostPorts — реально опубликованные на хосте порты (docker ps),
+// чтобы авто-выбор порта не наступал на уже запущенные контейнеры.
+func dockerHostPorts() map[int]bool {
 	ports := map[int]bool{}
-	data, err := os.ReadFile(composePath())
-	if err != nil { return ports }
-	for _, m := range regexp.MustCompile(`127\.0\.0\.1:(\d+):`).FindAllStringSubmatch(string(data), -1) {
-		p, _ := strconv.Atoi(m[1]); ports[p] = true
+	out, err := exec.Command("docker", "ps", "-a", "--format", "{{.Ports}}").Output()
+	if err != nil {
+		return ports
+	}
+	for _, m := range regexp.MustCompile(`:(\d+)->`).FindAllStringSubmatch(string(out), -1) {
+		if p, err := strconv.Atoi(m[1]); err == nil {
+			ports[p] = true
+		}
+	}
+	return ports
+}
+
+func usedPorts() map[int]bool {
+	ports := dockerHostPorts()
+	if data, err := os.ReadFile(composePath()); err == nil {
+		for _, m := range regexp.MustCompile(`(\d+):\d+"`).FindAllStringSubmatch(string(data), -1) {
+			if p, err := strconv.Atoi(m[1]); err == nil {
+				ports[p] = true
+			}
+		}
 	}
 	return ports
 }
 
 func freePort(start int) int {
 	used := usedPorts()
-	for used[start] { start++ }
+	for used[start] {
+		start++
+	}
 	return start
+}
+
+// containerHostPort — фактический host-порт запущенного сервиса (0 если нет).
+func containerHostPort(name string) int {
+	out, err := exec.Command("docker", "inspect", "-f",
+		`{{range $p, $conf := .NetworkSettings.Ports}}{{range $conf}}{{.HostPort}} {{end}}{{end}}`, name).Output()
+	if err != nil {
+		return 0
+	}
+	for _, f := range strings.Fields(string(out)) {
+		if p, err := strconv.Atoi(f); err == nil && p > 0 {
+			return p
+		}
+	}
+	return 0
 }
 
 // ═══════════════════════════════════════════
@@ -102,41 +168,47 @@ func detectLang(dir string) LangInfo {
 	var files []string
 	filepath.Walk(dir, func(p string, i os.FileInfo, e error) error {
 		if e != nil || i.IsDir() {
-			if i != nil && skip[i.Name()] { return filepath.SkipDir }
+			if i != nil && skip[i.Name()] {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		files = append(files, i.Name())
 		return nil
 	})
 
-	has := func(ext string) bool { for _, f := range files { if strings.HasSuffix(f, ext) { return true } }; return false }
-	contains := func(name string) bool { for _, f := range files { if f == name { return true } }; return false }
+	has := func(ext string) bool {
+		for _, f := range files {
+			if strings.HasSuffix(f, ext) {
+				return true
+			}
+		}
+		return false
+	}
+	contains := func(name string) bool {
+		for _, f := range files {
+			if f == name {
+				return true
+			}
+		}
+		return false
+	}
 
-	// Rust
 	if contains("Cargo.toml") {
 		return LangInfo{"rust", "rust", 8080, nil}
 	}
-	// Go
 	if contains("go.mod") {
 		return LangInfo{"go", "go", 8080, nil}
 	}
-	// Java/Kotlin
 	if contains("pom.xml") || contains("build.gradle") || contains("build.gradle.kts") {
 		return LangInfo{"jvm", "jvm", 8080, nil}
 	}
-	// .NET/C#
-	if contains("*.csproj") || contains("*.sln") || has(".cs") {
-		return LangInfo{"dotnet", "dotnet", 8080, nil}
-	}
-	// Ruby
 	if contains("Gemfile") || has(".rb") {
 		return LangInfo{"ruby", "ruby", 3000, nil}
 	}
-	// Elixir
 	if contains("mix.exs") {
 		return LangInfo{"elixir", "elixir", 4000, nil}
 	}
-	// Node.js / TypeScript / Bun / Deno
 	if contains("package.json") {
 		if contains("bun.lockb") || contains("bun.lock") {
 			return LangInfo{"bun", "bun", 3000, nil}
@@ -149,71 +221,66 @@ func detectLang(dir string) LangInfo {
 	if contains("deno.json") || contains("deno.jsonc") {
 		return LangInfo{"deno", "deno", 8000, nil}
 	}
-	// Python
 	if has(".py") || contains("requirements.txt") || contains("pyproject.toml") || contains("Pipfile") || contains("poetry.lock") {
 		framework := "python"
 		if has(".py") {
 			content := readFileFirstN(dir, 50)
-			if strings.Contains(content, "django") || contains("manage.py") { framework = "django" }
-			if strings.Contains(content, "flask") { framework = "flask" }
-			if strings.Contains(content, "fastapi") { framework = "fastapi" }
-			if strings.Contains(content, "gunicorn") { framework = "python" }
+			if strings.Contains(content, "django") || contains("manage.py") {
+				framework = "django"
+			}
+			if strings.Contains(content, "flask") {
+				framework = "flask"
+			}
+			if strings.Contains(content, "fastapi") {
+				framework = "fastapi"
+			}
 		}
 		return LangInfo{framework, framework, 8000, nil}
 	}
-	// PHP
-	if has(".php") || contains("composer.json") {
-		exts := []string{"curl", "mbstring", "opcache"}
+	if has(".php") || contains("composer.json") || contains("index.php") {
+		exts := []string{"curl", "mbstring", "opcache", "pdo_sqlite"}
 		if has(".php") {
 			content := readFileFirstN(dir, 100)
-			if strings.Contains(content, "sqlite") || strings.Contains(content, "PDO") {
-				exts = append(exts, "pdo_sqlite")
-			}
 			if strings.Contains(content, "gd") || strings.Contains(content, "imagecreate") {
 				exts = append(exts, "gd")
 			}
-			if strings.Contains(content, "redis") { exts = append(exts, "redis") }
-			if strings.Contains(content, "xml") || strings.Contains(content, "DOMDocument") {
-				exts = append(exts, "dom")
+			if strings.Contains(content, "redis") {
+				exts = append(exts, "redis")
 			}
 		}
-		return LangInfo{"php", "php", 9000, exts}
+		return LangInfo{"php", "php", 8080, exts}
 	}
-	// Haskell
-	if contains("stack.yaml") || contains("*.cabal") || has(".hs") {
+	if contains("stack.yaml") || has(".hs") {
 		return LangInfo{"haskell", "haskell", 8080, nil}
 	}
-	// Lua
-	if has(".lua") || contains("luarocks.lock") {
+	if has(".lua") {
 		return LangInfo{"lua", "lua", 8080, nil}
 	}
-	// Zig
 	if contains("build.zig") {
 		return LangInfo{"zig", "zig", 8080, nil}
 	}
-	// Nim
-	if contains("*.nimble") || has(".nim") {
+	if has(".nim") {
 		return LangInfo{"nim", "nim", 8080, nil}
 	}
-	// Swift
 	if contains("Package.swift") {
 		return LangInfo{"swift", "swift", 8080, nil}
 	}
-	// C/C++
-	if has(".c") || has(".cpp") || has(".h") || has(".hpp") || contains("CMakeLists.txt") || contains("Makefile") {
+	if has(".c") || has(".cpp") || contains("CMakeLists.txt") {
 		return LangInfo{"c", "c", 8080, nil}
 	}
-	// Static fallback
 	return LangInfo{"static", "static", 8080, nil}
 }
 
 func readFileFirstN(dir string, n int) string {
 	var lines []string
 	filepath.Walk(dir, func(p string, i os.FileInfo, e error) error {
-		if e != nil || i.IsDir() || len(lines) >= n { return nil }
+		if e != nil || i.IsDir() || len(lines) >= n {
+			return nil
+		}
 		if strings.HasSuffix(i.Name(), ".py") || strings.HasSuffix(i.Name(), ".php") || strings.HasSuffix(i.Name(), ".js") || strings.HasSuffix(i.Name(), ".ts") {
-			data, err := os.ReadFile(p)
-			if err == nil { lines = append(lines, string(data)) }
+			if data, err := os.ReadFile(p); err == nil {
+				lines = append(lines, string(data))
+			}
 		}
 		return nil
 	})
@@ -223,9 +290,13 @@ func readFileFirstN(dir string, n int) string {
 func detectDB(dir string) string {
 	var db string
 	filepath.Walk(dir, func(p string, i os.FileInfo, e error) error {
-		if e != nil || i.IsDir() { return nil }
+		if e != nil || i.IsDir() {
+			return nil
+		}
 		if strings.HasSuffix(i.Name(), ".db") || strings.HasSuffix(i.Name(), ".sqlite") || strings.HasSuffix(i.Name(), ".sqlite3") {
-			if i.Size() > 0 { db = p }
+			if i.Size() > 0 {
+				db = p
+			}
 		}
 		return nil
 	})
@@ -233,286 +304,83 @@ func detectDB(dir string) string {
 }
 
 // ═══════════════════════════════════════════
-//  Universal Dockerfile generator
+//  Compose helpers
 // ═══════════════════════════════════════════
 
-func genDockerfile(dir string, lang LangInfo) string {
-	switch lang.Name {
-	case "static":
-		return `FROM nginx:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-`
-	case "php":
-		return fmt.Sprintf(`FROM php:8.2-fpm-alpine
-RUN apk add --no-cache sqlite curl-dev oniguruma-dev
-RUN docker-php-ext-install %s
-RUN printf '[www]\\nuser = www-data\\ngroup = www-data\\nlisten = 0.0.0.0:9000\\npm = dynamic\\npm.max_children = 3\\npm.start_servers = 1\\npm.min_spare_servers = 1\\npm.max_spare_servers = 2\\n' > /usr/local/etc/php-fpm.d/zz-custom.conf
-WORKDIR /var/www
-`, strings.Join(lang.Extensions, " "))
+var serviceNameRe = regexp.MustCompile(`[^a-z0-9_.-]+`)
 
-	case "python", "django", "flask", "fastapi":
-		return `FROM python:3.12-alpine
-RUN apk add --no-cache gcc musl-dev
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:8000 ${APP_MODULE:-app:app}"]
-`
-	case "node", "node-ts":
-		return `FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY . .
-CMD ["node", "index.js"]
-`
-	case "bun":
-		return `FROM oven/bun:alpine
-WORKDIR /app
-COPY package*.json bun.lock* ./
-RUN bun install --production
-COPY . .
-CMD ["bun", "run", "index.ts"]
-`
-	case "deno":
-		return `FROM denoland/deno:alpine
-WORKDIR /app
-COPY . .
-CMD ["deno", "run", "--allow-net", "--allow-env", "main.ts"]
-`
-	case "go":
-		return `FROM golang:1.22-alpine AS build
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -o /app/server .
-
-FROM alpine:3.19
-COPY --from=build /app/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
-	case "rust":
-		return `FROM rust:1.77-alpine AS build
-RUN apk add --no-cache musl-dev
-WORKDIR /src
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main(){}" > src/main.rs && cargo build --release && rm -rf src
-COPY src ./src
-RUN touch src/main.rs && cargo build --release
-
-FROM alpine:3.19
-COPY --from=build /target/release/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
-	case "jvm":
-		return `FROM eclipse-temurin:21-jdk-alpine AS build
-WORKDIR /src
-COPY . .
-RUN if [ -f "pom.xml" ]; then ./mvnw package -DskipTests; elif [ -f "build.gradle" ]; then ./gradlew bootJar; fi
-
-FROM eclipse-temurin:21-jre-alpine
-COPY --from=build /src/target/*.jar /app.jar
-EXPOSE 8080
-CMD ["java", "-jar", "/app.jar"]
-`
-	case "dotnet":
-		return `FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
-WORKDIR /src
-COPY . .
-RUN dotnet publish -c Release -o /app
-
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
-COPY --from=build /app /app
-EXPOSE 8080
-WORKDIR /app
-CMD ["dotnet", "app.dll"]
-`
-	case "ruby":
-		return `FROM ruby:3.3-alpine
-WORKDIR /app
-COPY Gemfile* ./
-RUN bundle install
-COPY . .
-CMD ["ruby", "app.rb"]
-`
-	case "elixir":
-		return `FROM elixir:1.16-alpine
-RUN apk add --no-cache build-base
-WORKDIR /app
-COPY mix.exs mix.lock ./
-RUN mix deps.get && mix compile
-COPY . .
-CMD ["mix", "phx.server"]
-`
-	case "haskell":
-		return `FROM haskell:9.6-alpine AS build
-WORKDIR /src
-COPY . .
-RUN cabal build all
-
-FROM alpine:3.19
-COPY --from=build /src/dist-newstyle/**/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
-	case "lua":
-		return `FROM lua:5.4-alpine
-RUN apk add --no-cache luarocks
-WORKDIR /app
-COPY . .
-CMD ["lua", "main.lua"]
-`
-	case "zig":
-		return `FROM zig:0.11-alpine AS build
-WORKDIR /src
-COPY . .
-RUN zig build -Drelease-safe=true
-
-FROM alpine:3.19
-COPY --from=build /src/zig-out/bin/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
-	case "nim":
-		return `FROM nimlang/nim:alpine
-WORKDIR /app
-COPY *.nimble ./
-RUN nimble install -d -y
-COPY . .
-RUN nim c -d:release server.nim
-
-FROM alpine:3.19
-COPY --from=build /app/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
-	case "swift":
-		return `FROM swift:5.10-alpine AS build
-WORKDIR /src
-COPY . .
-RUN swift build -c release
-
-FROM alpine:3.19
-COPY --from=build /src/.build/release/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
-	case "c":
-		return `FROM gcc:alpine AS build
-WORKDIR /src
-COPY . .
-RUN gcc -O2 -o server *.c -lm
-
-FROM alpine:3.19
-COPY --from=build /src/server /server
-EXPOSE 8080
-CMD ["/server"]
-`
+// serviceName превращает имя сайта в валидное имя docker-сервиса.
+func serviceName(name string) string {
+	s := serviceNameRe.ReplaceAllString(strings.ToLower(name), "-")
+	s = strings.Trim(s, "-.")
+	if s == "" {
+		s = "site"
 	}
-	return `FROM alpine:3.19
-WORKDIR /app
-COPY . .
-CMD ["sh", "-c", "echo 'No Dockerfile detected. Add one to your project.' && sleep infinity"]
-`
+	return s
 }
 
-// ═══════════════════════════════════════════
-//  Compose manipulation
-// ═══════════════════════════════════════════
+func defaultCompose() string { return "services: {}\nvolumes: {}\n" }
 
 func readCompose() string {
 	data, err := os.ReadFile(composePath())
-	if err != nil { return defaultCompose() }
+	if err != nil || strings.TrimSpace(string(data)) == "" {
+		return defaultCompose()
+	}
 	return string(data)
 }
 
-func writeCompose(c string) { os.WriteFile(composePath(), []byte(c), 0644) }
+func writeCompose(c string) {
+	p := composePath()
+	os.MkdirAll(filepath.Dir(p), 0755)
+	os.WriteFile(p, []byte(c), 0644)
+}
+
+func readRunnersCompose() string {
+	data, err := os.ReadFile(runnersComposePath())
+	if err != nil || strings.TrimSpace(string(data)) == "" {
+		return defaultCompose()
+	}
+	return string(data)
+}
+
+func writeRunnersCompose(c string) {
+	p := runnersComposePath()
+	os.MkdirAll(filepath.Dir(p), 0755)
+	os.WriteFile(p, []byte(c), 0644)
+}
 
 func insertService(content, block string) string {
-	// Find the top-level "volumes:" key and insert before it
+	block = strings.Trim(block, "\n")
+	if strings.Contains(content, "services: {}") {
+		return strings.Replace(content, "services: {}", "services:\n"+block, 1)
+	}
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
-		if strings.TrimSpace(line) == "volumes:" && (i == 0 || (!strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t"))) {
-			// Insert before this line
-			result := strings.Join(lines[:i], "\n") + "\n" + strings.TrimLeft(block, "\n") + "\n" + strings.Join(lines[i:], "\n")
-			return result
+		if strings.TrimSpace(line) == "volumes:" && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+			return strings.Join(lines[:i], "\n") + "\n" + block + "\n" + strings.Join(lines[i:], "\n")
 		}
 	}
-	// No volumes section found, just append
-	return strings.TrimRight(content, "\n") + "\n" + block
-}
-
-func defaultCompose() string {
-	return `services:
-  runner:
-    image: data.forgejo.org/forgejo/runner:4.0.0
-    container_name: runner
-    restart: unless-stopped
-    volumes:
-      - /root/forgejo-runner/data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/www:/var/www
-    command: sh -c "sleep 10 && apk update && apk add --no-cache nodejs npm && forgejo-runner daemon --config /data/config.yaml"
-`
-}
-
-func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
-	tmpl := filepath.Join(resolveTemplatesDir(), lang.Template)
-	safeName := strings.ToLower(name)
-
-	// Check if project has its own Dockerfile
-	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
-		tmpl = dir
-	}
-
-	switch lang.Name {
-	case "static":
-		return fmt.Sprintf(`  %s:
-    image: nginx:alpine
-    container_name: %s
-    restart: unless-stopped
-    ports: ["127.0.0.1:%d:80"]
-    volumes:
-      - %s:/usr/share/nginx/html:ro
-      - %s/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-`, safeName, safeName, port, dir, tmpl)
-	case "php":
-		s := safeName + "-php"
-		return fmt.Sprintf(`  %s:
-    build: %s
-    container_name: %s
-    restart: unless-stopped
-    ports: ["127.0.0.1:%d:9000"]
-    volumes:
-      - %s:/var/www/%s
-`, s, tmpl, s, port, dir, name)
-	default:
-		return fmt.Sprintf(`  %s:
-    build: %s
-    container_name: %s
-    restart: unless-stopped
-    ports: ["127.0.0.1:%d:8080"]
-    volumes:
-      - %s:/app
-`, safeName, tmpl, safeName, port, dir)
-	}
+	return strings.TrimRight(content, "\n") + "\n" + block + "\n"
 }
 
 func removeService(content, name string) string {
-	for _, s := range []string{name, name + "-php", name + "-node", name + "-go", name + "-python", name + "-rust", name + "-jvm", name + "-dotnet", name + "-ruby", name + "-bun", name + "-deno"} {
+	candidates := []string{name}
+	for _, suffix := range []string{"-php", "-node", "-go", "-python", "-rust", "-jvm", "-dotnet", "-ruby", "-bun", "-deno"} {
+		candidates = append(candidates, name+suffix)
+	}
+	for _, s := range candidates {
 		re := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(s) + `:.*`)
 		loc := re.FindStringIndex(content)
-		if loc == nil { continue }
-		start := loc[0]
-		end := loc[1]
+		if loc == nil {
+			continue
+		}
+		start, end := loc[0], loc[1]
 		for end < len(content) {
-			if end >= len(content) { break }
 			if content[end] == '\n' {
-				if end+1 < len(content) && content[end+1] == ' ' { end++; continue }
+				if end+1 < len(content) && content[end+1] == ' ' {
+					end++
+					continue
+				}
 				break
 			}
 			end++
@@ -524,18 +392,394 @@ func removeService(content, name string) string {
 
 func listServices() []string {
 	var out []string
-	for _, m := range regexp.MustCompile(`(?m)^  (\S+):`).FindAllStringSubmatch(readCompose(), -1) {
-		if m[1] != "runner" && !strings.HasPrefix(m[1], "runner-") { out = append(out, m[1]) }
+	for _, m := range regexp.MustCompile(`(?m)^  ([a-zA-Z0-9_.-]+):`).FindAllStringSubmatch(readCompose(), -1) {
+		switch m[1] {
+		case "services", "volumes", "networks":
+			continue
+		}
+		out = append(out, m[1])
 	}
 	return out
 }
 
+// runnerNames — реальные контейнеры раннеров (а не только из compose).
 func runnerNames() []string {
-	var out []string
-	for _, m := range regexp.MustCompile(`(?m)^  (runner\S*):`).FindAllStringSubmatch(readCompose(), -1) {
-		out = append(out, m[1])
+	out, err := exec.Command("docker", "ps", "-a", "--format", "{{.Names}}").Output()
+	if err != nil {
+		return nil
 	}
-	return out
+	var r []string
+	for _, n := range strings.Fields(string(out)) {
+		if n == "runner" || strings.HasPrefix(n, "runner-") {
+			r = append(r, n)
+		}
+	}
+	return r
+}
+
+// ═══════════════════════════════════════════
+//  Dockerfile generation
+// ═══════════════════════════════════════════
+
+func innerPort(lang LangInfo) int {
+	switch lang.Name {
+	case "static", "php":
+		return 80
+	case "python", "django", "flask", "fastapi", "deno":
+		return 8000
+	case "node", "node-ts", "bun", "ruby":
+		return 3000
+	case "elixir":
+		return 4000
+	default:
+		return 8080
+	}
+}
+
+// prepareBuild создаёт .deploy.Dockerfile в каталоге сайта из шаблона
+// (для языков, которые собираются в образ). Репо может дать свой Dockerfile.
+func prepareBuild(dir string, lang LangInfo) error {
+	if lang.Name == "static" || lang.Name == "php" {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(resolveTemplatesDir(), lang.Template, "Dockerfile"))
+	if err != nil {
+		return fmt.Errorf("шаблон %s не найден: %v", lang.Template, err)
+	}
+	di := filepath.Join(dir, ".dockerignore")
+	if _, err := os.Stat(di); err != nil {
+		os.WriteFile(di, []byte(".git\nnode_modules\n__pycache__\n.venv\ndist\nbuild\n*.db\n*.sqlite\n*.sqlite3\n*.db-wal\n*.db-shm\n*.zip\n"), 0644)
+	}
+	return os.WriteFile(filepath.Join(dir, ".deploy.Dockerfile"), data, 0644)
+}
+
+// ═══════════════════════════════════════════
+//  Service block
+// ═══════════════════════════════════════════
+
+func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
+	safe := serviceName(name)
+	tmpl := filepath.Join(resolveTemplatesDir(), lang.Template)
+	bind := os.Getenv("DEPLOY_BIND")
+	if bind == "" {
+		bind = "0.0.0.0"
+	}
+	ownDockerfile := false
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
+		ownDockerfile = true
+	}
+
+	switch lang.Name {
+	case "static":
+		return fmt.Sprintf(`  %s:
+    image: nginx:alpine
+    container_name: %s
+    restart: unless-stopped
+    ports: ["%s:%d:80"]
+    volumes:
+      - %s:/usr/share/nginx/html:ro
+      - %s/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - "deploy-stack.site=%s"
+`, safe, safe, bind, port, dir, tmpl, name)
+
+	case "php":
+		build := tmpl
+		if ownDockerfile {
+			build = dir
+		}
+		return fmt.Sprintf(`  %s:
+    build: %s
+    container_name: %s
+    restart: unless-stopped
+    ports: ["%s:%d:80"]
+    volumes:
+      - %s:/var/www/html
+      - %s:/var/www/%s
+    labels:
+      - "deploy-stack.site=%s"
+`, safe, build, safe, bind, port, dir, dir, name, name)
+
+	default:
+		inner := innerPort(lang)
+		df := ".deploy.Dockerfile"
+		if ownDockerfile {
+			df = "Dockerfile"
+		}
+		return fmt.Sprintf(`  %s:
+    build:
+      context: %s
+      dockerfile: %s
+    container_name: %s
+    restart: unless-stopped
+    ports: ["%s:%d:%d"]
+    environment:
+      - PORT=%d
+    labels:
+      - "deploy-stack.site=%s"
+`, safe, dir, df, safe, bind, port, inner, inner, name)
+	}
+}
+
+// ═══════════════════════════════════════════
+//  Deploy
+// ═══════════════════════════════════════════
+
+func dockerCompose(args ...string) int { return dockerComposeFile(composePath(), args...) }
+
+func dockerComposeFile(path string, args ...string) int {
+	cmd := exec.Command("docker", append([]string{"compose", "-f", path}, args...)...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return ee.ExitCode()
+		}
+		return 1
+	}
+	return 0
+}
+
+// syncDir копирует исходники в /var/www/<name> (rsync, иначе cp -a).
+func syncDir(src, dst string) error {
+	os.MkdirAll(dst, 0755)
+	if _, err := exec.LookPath("rsync"); err == nil {
+		cmd := exec.Command("rsync", "-a", "--delete",
+			"--exclude=.git", "--exclude=*.db", "--exclude=*.sqlite", "--exclude=*.sqlite3",
+			"--exclude=*.db-wal", "--exclude=*.db-shm", "--exclude=.deploy.Dockerfile",
+			src+"/", dst+"/")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("rsync: %v: %s", err, strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+	return copyTree(src, dst)
+}
+
+func copyTree(src, dst string) error {
+	return filepath.Walk(src, func(p string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(src, p)
+		if rel == "." {
+			return nil
+		}
+		if fi.IsDir() {
+			if fi.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return os.MkdirAll(filepath.Join(dst, rel), 0755)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		return os.WriteFile(filepath.Join(dst, rel), data, fi.Mode())
+	})
+}
+
+func runMigrations(svc, dir, name string) {
+	base := "/var/www/" + name
+	for _, s := range []string{"install/migrate.sh", "migrate.sh", "db/migrate.sh"} {
+		if _, err := os.Stat(filepath.Join(dir, s)); err == nil {
+			fmt.Printf("  migration: %s\n", s)
+			cmd := exec.Command("docker", "exec", svc, "sh", filepath.Join(base, s))
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+			cmd.Run()
+			return
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
+		fmt.Println("  migration: php artisan migrate --force")
+		cmd := exec.Command("docker", "exec", svc, "php", filepath.Join(base, "artisan"), "migrate", "--force")
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		cmd.Run()
+	}
+}
+
+// deploySite создаёт/обновляет сервис сайта и поднимает его. Возвращает фактический порт.
+func deploySite(name, dir string, port int, lang LangInfo) (int, error) {
+	if err := prepareBuild(dir, lang); err != nil {
+		return 0, err
+	}
+	safe := serviceName(name)
+	c := readCompose()
+	c = removeService(c, safe)
+	c = insertService(c, buildServiceBlock(name, dir, port, lang))
+	writeCompose(c)
+
+	if code := dockerCompose("up", "-d", "--build", safe); code != 0 {
+		return 0, fmt.Errorf("docker compose завершился с ошибкой для %s", safe)
+	}
+	runMigrations(safe, dir, name)
+
+	actual := containerHostPort(safe)
+	if actual == 0 {
+		actual = port
+	}
+	return actual, nil
+}
+
+// envOr returns first non-empty string.
+func envOr(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func ciRepoName() string {
+	for _, k := range []string{"GITHUB_REPOSITORY", "CI_PROJECT_PATH", "GITEA_REPOSITORY", "DEPLOY_REPO"} {
+		if v := os.Getenv(k); v != "" {
+			parts := strings.Split(v, "/")
+			return parts[len(parts)-1]
+		}
+	}
+	return ""
+}
+
+// loadDeployConfig читает опциональный deploy-конфиг в каталоге сайта:
+// .deploy.env / deploy.env / .deploy (KEY=VALUE или KEY: VALUE).
+func loadDeployConfig(dir string) map[string]string {
+	cfg := map[string]string{}
+	for _, f := range []string{".deploy.env", "deploy.env", ".deploy"} {
+		data, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			sep := strings.IndexAny(line, "=:")
+			if sep <= 0 {
+				continue
+			}
+			k := strings.ToUpper(strings.TrimSpace(line[:sep]))
+			v := strings.Trim(strings.TrimSpace(line[sep+1:]), `"'`)
+			cfg[k] = v
+		}
+	}
+	return cfg
+}
+
+func parseFlags(args []string) map[string]string {
+	opts := map[string]string{}
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		a = strings.TrimLeft(a, "-")
+		if eq := strings.Index(a, "="); eq > 0 {
+			opts[a[:eq]] = a[eq+1:]
+			continue
+		}
+		if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			opts[a] = args[i+1]
+			i++
+		} else {
+			opts[a] = "true"
+		}
+	}
+	return opts
+}
+
+// autoDeploy — «умный» режим: минимум ввода (label + port в workflow), всё остальное само.
+func autoDeploy(args []string) {
+	opts := parseFlags(args)
+
+	dir := envOr("DEPLOY_DIR", "GITHUB_WORKSPACE")
+	if v := opts["dir"]; v != "" {
+		dir = v
+	}
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	dir, _ = filepath.Abs(dir)
+
+	cfg := loadDeployConfig(dir)
+
+	name := envOr("DEPLOY_SITE")
+	if v := opts["name"]; v != "" {
+		name = v
+	}
+	if name == "" {
+		name = cfg["NAME"]
+	}
+	if name == "" {
+		name = ciRepoName()
+	}
+	if name == "" {
+		name = filepath.Base(dir)
+	}
+	name = strings.TrimSpace(name)
+
+	typ := envOr("DEPLOY_TYPE")
+	if v := opts["type"]; v != "" {
+		typ = v
+	}
+	if typ == "" {
+		typ = cfg["TYPE"]
+	}
+
+	var lang LangInfo
+	if typ != "" {
+		if _, ok := templates[typ]; ok {
+			lang = LangInfo{typ, typ, defaultPorts[typ], nil}
+		}
+	}
+	if lang.Name == "" {
+		lang = detectLang(dir)
+	}
+
+	portStr := envOr("DEPLOY_PORT", "PORT")
+	if v := opts["port"]; v != "" {
+		portStr = v
+	}
+	if portStr == "" {
+		portStr = cfg["PORT"]
+	}
+	port := 0
+	if portStr != "" {
+		port, _ = strconv.Atoi(strings.TrimSpace(portStr))
+	}
+	if port == 0 {
+		port = freePort(lang.Port)
+	}
+
+	target := "/var/www/" + name
+	if filepath.Clean(dir) != filepath.Clean(target) {
+		if err := syncDir(dir, target); err != nil {
+			fmt.Printf("  ! синхронизация: %v\n", err)
+		}
+	}
+	srcDir := target
+	if fi, err := os.Stat(target); err != nil || !fi.IsDir() {
+		srcDir = dir
+	}
+
+	fmt.Printf("• %s (%s), каталог: %s\n", name, lang.Name, srcDir)
+	actual, err := deploySite(name, srcDir, port, lang)
+	if err != nil {
+		fmt.Printf("✗ %s: %v\n", name, err)
+		os.Exit(1)
+	}
+	fmt.Printf("✓ %s задеплоен: http://%s:%d\n", name, hostIP(), actual)
+}
+
+func hostIP() string {
+	if v := os.Getenv("DEPLOY_HOST"); v != "" {
+		return v
+	}
+	return "0.0.0.0"
 }
 
 // ═══════════════════════════════════════════
@@ -544,36 +788,39 @@ func runnerNames() []string {
 
 func addRunner(name, token, forgejoURL string) {
 	svc := "runner"
-	if name != "" { svc = "runner-" + name }
-	content := readCompose()
+	if name != "" {
+		svc = serviceName("runner-" + name)
+	}
+	content := readRunnersCompose()
 	content = removeService(content, svc)
 	block := fmt.Sprintf(`  %s:
     image: data.forgejo.org/forgejo/runner:4.0.0
     container_name: %s
+    user: root
     restart: unless-stopped
-    environment:
-      - FORGEJO_RUNNER_REGISTRATION_TOKEN=%s
-      - FORGEJO_URL=%s
     volumes:
-      - /root/forgejo-runner/%s:/data
+      - %s/%s:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/www:/var/www
-    command: sh -c "sleep 10 && apk update && apk add --no-cache nodejs npm && forgejo-runner daemon --config /data/config.yaml"
-`, svc, svc, token, forgejoURL, svc)
+      - %s:%s
+    environment:
+      DEPLOY_HOME: %s
+    command: >
+      sh -c "apk update && apk add --no-cache docker-cli docker-cli-compose rsync nodejs npm &&
+             ln -sf %s/deploy /usr/local/bin/deploy &&
+             forgejo-runner daemon --config /data/config.yaml"
+`, svc, svc, runnerDataRoot(), svc, deployHome(), deployHome(), deployHome(), deployHome())
 	content = insertService(content, block)
-	writeCompose(content)
-	fmt.Printf("✓ Runner '%s' added\n", svc)
+	writeRunnersCompose(content)
+	dockerComposeFile(runnersComposePath(), "up", "-d", svc)
+	fmt.Printf("✓ Runner '%s' added (token: %s, url: %s)\n", svc, mask(token), forgejoURL)
 }
 
-// ═══════════════════════════════════════════
-//  Docker
-// ═══════════════════════════════════════════
-
-func dockerCompose(args ...string) {
-	cmd := exec.Command("docker", append([]string{"compose", "-f", composePath()}, args...)...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Run()
+func mask(s string) string {
+	if len(s) <= 6 {
+		return "***"
+	}
+	return s[:3] + "***" + s[len(s)-3:]
 }
 
 // ═══════════════════════════════════════════
@@ -583,158 +830,253 @@ func dockerCompose(args ...string) {
 func interactive() {
 	fmt.Println("\n╔══════════════════════════════════════════╗")
 	fmt.Println("║        Deploy Stack — Add new site       ║")
-	fmt.Println("╚══════════════════════════════════════════╝\n")
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Println()
 
 	name := prompt("  Site name: ")
-	if name == "" { fmt.Println("  Error: name required"); return }
+	if name == "" {
+		fmt.Println("  Error: name required")
+		return
+	}
+	name = strings.TrimSpace(name)
 
 	dir := prompt(fmt.Sprintf("  Code directory [/var/www/%s]: ", name))
-	if dir == "" { dir = "/var/www/" + name }
+	if dir == "" {
+		dir = "/var/www/" + name
+	}
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if strings.ToLower(prompt(fmt.Sprintf("  Create %s? [Y/n]: ", dir))) != "n" {
 			os.MkdirAll(dir, 0755)
-		} else { return }
+		} else {
+			return
+		}
 	}
 
 	lang := detectLang(dir)
 	db := detectDB(dir)
 
 	fmt.Printf("\n  Detected: %s\n", lang.Name)
-	if db != "" { fmt.Printf("  Database: %s\n", filepath.Base(db)) }
+	if db != "" {
+		fmt.Printf("  Database: %s\n", filepath.Base(db))
+	}
 
-	autoPort := freePort(lang.Port)
-	portStr := prompt(fmt.Sprintf("  Port [%d auto]: ", autoPort))
-	port := autoPort
-	if portStr != "" && strings.ToLower(portStr) != "auto" { port, _ = strconv.Atoi(portStr) }
+	autoP := freePort(lang.Port)
+	portStr := prompt(fmt.Sprintf("  Port [%d auto]: ", autoP))
+	port := autoP
+	if portStr != "" && strings.ToLower(portStr) != "auto" {
+		if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+			port = p
+		}
+	}
 
 	fmt.Printf("\n  ┌──────────────────────────────┐\n")
 	fmt.Printf("  │ Name:  %-22s │\n", name)
 	fmt.Printf("  │ Dir:   %-22s │\n", dir)
 	fmt.Printf("  │ Lang:  %-22s │\n", lang.Name)
 	fmt.Printf("  │ Port:  %-22d │\n", port)
-	if db != "" { fmt.Printf("  │ DB:    %-22s │\n", filepath.Base(db)) }
+	if db != "" {
+		fmt.Printf("  │ DB:    %-22s │\n", filepath.Base(db))
+	}
 	fmt.Printf("  └──────────────────────────────┘\n")
 
-	if strings.ToLower(prompt("\n  Deploy? [Y/n]: ")) == "n" { return }
+	if strings.ToLower(prompt("\n  Deploy? [Y/n]: ")) == "n" {
+		return
+	}
 
-	content := readCompose()
-	content = removeService(content, name)
-	content = insertService(content, buildServiceBlock(name, dir, port, lang))
-	writeCompose(content)
-
-	svc := name; if lang.Name == "php" { svc = name + "-php" }
-	fmt.Println()
-	dockerCompose("up", "-d", "--build", svc)
-	fmt.Printf("\n  ✓ %s deployed on port %d\n", name, port)
+	actual, err := deploySite(name, dir, port, lang)
+	if err != nil {
+		fmt.Printf("\n  ✗ %v\n", err)
+		return
+	}
+	fmt.Printf("\n  ✓ %s deployed: http://%s:%d\n", name, hostIP(), actual)
 }
 
 // ═══════════════════════════════════════════
 //  Main
 // ═══════════════════════════════════════════
 
+func usage() {
+	fmt.Print(`deploy-stack — Universal site deployer
+
+Usage:
+  deploy                                  Авто-деплой текущего репозитория (CI) / интерактивно
+  deploy --port N [--name N] [--type T]   Авто-деплой с явными параметрами
+  deploy add <name> <dir> [--port N]      Добавить сайт (авто-определение языка)
+  deploy rm <name>                        Удалить сайт
+  deploy list                             Список сайтов с портами и статусом
+  deploy runners                          Список раннеров
+  deploy add-runner <name> <token>        Добавить Forgejo runner
+  deploy rm-runner [name]                 Удалить раннер(ы)
+  deploy logs <name> [--tail N]           Логи сайта
+  deploy restart <name>                   Перезапустить сайт
+  deploy status                           Контейнеры сайтов
+  deploy up / down                        Поднять/остановить все сайты
+  deploy serve --port 3000                Панель-менеджер (web UI + API)
+
+Zero-config: в workflow достаточно label (runs-on) и порта:
+  jobs:
+    deploy:
+      runs-on: web
+      env: { PORT: 8084 }
+      steps:
+        - uses: actions/checkout@v4
+        - run: deploy
+
+Поддерживаемые языки: PHP, Python, Django, Flask, FastAPI, Node.js, TypeScript,
+Bun, Deno, Go, Rust, Java/Kotlin, .NET/C#, Ruby, Elixir, Haskell, Lua, Zig,
+Nim, Swift, C/C++, и любой статический сайт.
+`)
+}
+
 func main() {
-	if len(os.Args) < 2 { interactive(); return }
+	args := os.Args[1:]
 
-	switch os.Args[1] {
+	if len(args) == 0 {
+		if isCI() || !isTTY() {
+			autoDeploy(nil)
+		} else {
+			interactive()
+		}
+		return
+	}
+
+	switch args[0] {
 	case "add":
-		if len(os.Args) < 4 { fmt.Println("Usage: deploy add <name> <dir> [--port N] [--type TYPE]"); return }
-		name, dir := os.Args[2], os.Args[3]
-		lang := detectLang(dir); port := freePort(lang.Port)
-		for i, a := range os.Args {
-			if a == "--port" && i+1 < len(os.Args) { port, _ = strconv.Atoi(os.Args[i+1]) }
-			if a == "--type" && i+1 < len(os.Args) {
-				tp := os.Args[i+1]
-				if _, ok := templates[tp]; ok { lang = LangInfo{tp, tp, defaultPorts[tp], nil} }
+		if len(args) < 3 {
+			fmt.Println("Usage: deploy add <name> <dir> [--port N] [--type T]")
+			return
+		}
+		name, dir := args[1], args[2]
+		opts := parseFlags(args[3:])
+		lang := detectLang(dir)
+		if t := opts["type"]; t != "" {
+			if _, ok := templates[t]; ok {
+				lang = LangInfo{t, t, defaultPorts[t], nil}
 			}
 		}
-		fmt.Printf("Adding %s (%s) port %d...\n", name, lang.Name, port)
-		c := readCompose(); c = removeService(c, name)
-		c = removeService(c, name)
-		c = insertService(c, buildServiceBlock(name, dir, port, lang))
-		writeCompose(c)
-		svc := name; if lang.Name == "php" { svc = name + "-php" }
-		dockerCompose("up", "-d", "--build", svc)
-
-		// Auto-migration: detect and run migration scripts
-		migrations := []string{
-			filepath.Join(dir, "install", "migrate.sh"),
-			filepath.Join(dir, "migrate.sh"),
-			filepath.Join(dir, "db", "migrate.sh"),
+		port := 0
+		if p := opts["port"]; p != "" {
+			port, _ = strconv.Atoi(p)
 		}
-		for _, m := range migrations {
-			if _, err := os.Stat(m); err == nil {
-				fmt.Printf("  Running migration: %s\n", filepath.Base(filepath.Dir(m)))
-				cmd := exec.Command("docker", "exec", svc, "sh", m)
-				cmd.Stdout = os.Stdout; cmd.Stderr = os.Stderr
-				cmd.Run()
-				break
-			}
+		if port == 0 {
+			port = freePort(lang.Port)
 		}
-		// Laravel artisan migrate
-		if _, err := os.Stat(filepath.Join(dir, "artisan")); err == nil {
-			fmt.Println("  Running: php artisan migrate --force")
-			cmd := exec.Command("docker", "exec", svc, "php", "/var/www/"+name+"/artisan", "migrate", "--force")
-			cmd.Stdout = os.Stdout; cmd.Stderr = os.Stderr
-			cmd.Run()
+		actual, err := deploySite(name, dir, port, lang)
+		if err != nil {
+			fmt.Printf("✗ %v\n", err)
+			os.Exit(1)
 		}
-		fmt.Printf("✓ %s deployed on port %d\n", name, port)
+		fmt.Printf("✓ %s deployed: http://%s:%d\n", name, hostIP(), actual)
 
 	case "rm":
-		if len(os.Args) < 3 { fmt.Println("Usage: deploy rm <name>"); return }
-		n := os.Args[2]
-		for _, s := range []string{n, n + "-php"} { dockerCompose("down", s) }
+		if len(args) < 2 {
+			fmt.Println("Usage: deploy rm <name>")
+			return
+		}
+		n := serviceName(args[1])
+		dockerCompose("down", "--remove-orphans", n)
 		writeCompose(removeService(readCompose(), n))
 		fmt.Printf("✓ %s removed\n", n)
 
 	case "list":
-		for _, s := range listServices() { fmt.Printf("  %s\n", s) }
+		for _, s := range listServices() {
+			st := getContainerStatus(s)
+			p := containerHostPort(s)
+			fmt.Printf("  %-24s port=%-6d %s\n", s, p, st)
+		}
+
 	case "runners":
-		for _, r := range runnerNames() { fmt.Printf("  %s\n", r) }
+		for _, r := range runnerNames() {
+			fmt.Printf("  %-24s %s\n", r, getContainerStatus(r))
+		}
+
 	case "add-runner":
-		if len(os.Args) < 4 { fmt.Println("Usage: deploy add-runner <name> <token> [--url URL]"); return }
-		url := "https://forgejo.example.com"
-		for i, a := range os.Args { if a == "--url" && i+1 < len(os.Args) { url = os.Args[i+1] } }
-		addRunner(os.Args[2], os.Args[3], url)
-		dockerCompose("up", "-d", os.Args[2])
+		if len(args) < 3 {
+			fmt.Println("Usage: deploy add-runner <name> <token> [--url URL]")
+			return
+		}
+		url := "http://10.0.0.1:3000"
+		for i, a := range args {
+			if a == "--url" && i+1 < len(args) {
+				url = args[i+1]
+			}
+		}
+		addRunner(args[1], args[2], url)
+
 	case "rm-runner":
-		n := ""; if len(os.Args) >= 3 { n = os.Args[2] }
+		n := ""
+		if len(args) >= 2 {
+			n = args[1]
+		}
 		if n == "" {
-			for _, r := range runnerNames() { dockerCompose("down", r) }
-			writeCompose(defaultCompose())
+			for _, r := range runnerNames() {
+				exec.Command("docker", "rm", "-f", r).Run()
+			}
+			writeRunnersCompose(defaultCompose())
 		} else {
-			dockerCompose("down", "runner-"+n)
-			writeCompose(removeService(readCompose(), "runner-"+n))
+			svc := serviceName("runner-" + n)
+			dockerComposeFile(runnersComposePath(), "down", svc)
+			writeRunnersCompose(removeService(readRunnersCompose(), svc))
 		}
 		fmt.Println("✓ Runner removed")
-	case "status": dockerCompose("ps")
-	case "up":     dockerCompose("up", "-d")
-	case "down":   dockerCompose("down")
+
+	case "logs":
+		if len(args) < 2 {
+			fmt.Println("Usage: deploy logs <name> [--tail N]")
+			return
+		}
+		tail := "200"
+		for i, a := range args {
+			if a == "--tail" && i+1 < len(args) {
+				tail = args[i+1]
+			}
+		}
+		cmd := exec.Command("docker", "logs", "--tail", tail, serviceName(args[1]))
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		cmd.Run()
+
+	case "restart":
+		if len(args) < 2 {
+			fmt.Println("Usage: deploy restart <name>")
+			return
+		}
+		cmd := exec.Command("docker", "restart", serviceName(args[1]))
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		cmd.Run()
+
+	case "status":
+		dockerCompose("ps")
+
+	case "up":
+		if len(args) > 1 {
+			dockerCompose("up", "-d", serviceName(args[1]))
+		} else {
+			dockerCompose("up", "-d")
+		}
+
+	case "down":
+		dockerCompose("down", "--remove-orphans")
+
+	case "deploy", "auto":
+		autoDeploy(args[1:])
+
 	case "serve":
 		port := 3000
-		for i, a := range os.Args {
-			if a == "--port" && i+1 < len(os.Args) {
-				port, _ = strconv.Atoi(os.Args[i+1])
+		for i, a := range args {
+			if a == "--port" && i+1 < len(args) {
+				port, _ = strconv.Atoi(args[i+1])
 			}
 		}
 		startWebServer(port)
+
+	case "help", "-h", "--help":
+		usage()
+
 	default:
-		fmt.Print(`deploy-stack — Universal site deployer
-
-Usage:
-  deploy                                  Interactive mode
-  deploy add <name> <dir> [--port N]      Add site (auto-detect language)
-  deploy rm <name>                        Remove site
-  deploy list                             List all sites
-  deploy runners                          List all runners
-  deploy add-runner <name> <token>        Add Forgejo runner
-  deploy rm-runner [name]                 Remove runner(s)
-  deploy status                           Show containers
-  deploy up / down                        Start/stop all
-
-Supported languages (auto-detected):
-  PHP, Python, Django, Flask, FastAPI, Node.js, TypeScript, Bun, Deno,
-  Go, Rust, Java, Kotlin, .NET/C#, Ruby, Elixir, Haskell, Lua, Zig,
-  Nim, Swift, C/C++, and any static site
-`)
+		if strings.HasPrefix(args[0], "-") {
+			autoDeploy(args)
+		} else {
+			usage()
+		}
 	}
 }

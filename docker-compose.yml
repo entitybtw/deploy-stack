@@ -42,7 +42,7 @@ services:
       - ./deploy-data:/deploy
       # шаблоны и статика менеджера — чтобы docker build брал их по HOST-путям
       - ./templates:/deploy/templates:ro
-      - ./static:/deploy/static:ro
+      - ./static:/deploy/static
     labels:
       - "deploy-stack.role=panel"
     healthcheck:

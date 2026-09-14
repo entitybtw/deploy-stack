@@ -633,7 +633,7 @@ func listContainers(showAll bool) []map[string]interface{} {
 		ports := ""
 		ctx3, cancel3 := context.WithTimeout(context.Background(), 3*time.Second)
 		portCmd := exec.CommandContext(ctx3, "docker", "inspect", "--format",
-			"{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{range $conf}}{{.HostPort}}{{end}} {{end}}", c.Name)
+			`{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{with index $conf 0}}{{.HostPort}}{{end}} {{end}}`, c.Name)
 		portOut, _ := portCmd.CombinedOutput()
 		cancel3()
 		ports = strings.TrimSpace(string(portOut))

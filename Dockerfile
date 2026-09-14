@@ -34,3 +34,4 @@ EXPOSE 3000
 
 # command см. docker-compose: deploy-stack serve --port 3000
 ENTRYPOINT ["/usr/local/bin/deploy-stack"]
+CMD ["serve", "--port", "3000"]

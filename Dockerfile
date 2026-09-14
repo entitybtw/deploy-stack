@@ -20,12 +20,11 @@ ENV DEPLOY_HOME=/deploy \
     DEPLOY_RUNNERS=/deploy/runners/docker-compose.yml \
     RUNNER_DATA=/runner
 
-COPY --from=build /deploy-stack /deploy/deploy
+COPY --from=build /deploy-stack /usr/local/bin/deploy-stack
 
 # Статик и шаблоны — читаются из DEPLOY_HOME если смонтированы, либо из фоллбеков
 COPY static/  /usr/local/share/deploy-stack/static/
 COPY templates/ /usr/local/share/deploy-stack/templates/
-COPY static/ /deploy/static/
 
 # Точки монтирования для панели (панель пишет в DEPLOY_HOME data/, sites/, runners/)
 VOLUME ["/deploy", "/runner"]
@@ -33,5 +32,5 @@ VOLUME ["/deploy", "/runner"]
 WORKDIR /deploy
 EXPOSE 3000
 
-# command см. docker-compose: deploy serve --port 3000
-ENTRYPOINT ["/deploy/deploy"]
+# command см. docker-compose: deploy-stack serve --port 3000
+ENTRYPOINT ["/usr/local/bin/deploy-stack"]

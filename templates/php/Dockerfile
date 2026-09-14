@@ -1,10 +1,9 @@
 FROM php:8.2-fpm-alpine
 
-# nginx + sqlite CLI (миграции) + инструменты
-RUN apk add --no-cache nginx sqlite curl-dev oniguruma-dev libpng-dev libzip-dev
-RUN docker-php-ext-install curl mbstring opcache pdo_sqlite gd
+RUN apk add --no-cache nginx sqlite curl-dev oniguruma-dev libzip-dev
 
-# конфиг nginx: корень сайта, PHP-FPM, защита секретов
+RUN docker-php-ext-install mbstring opcache pdo_sqlite zip || true
+
 RUN printf '%s\n' \
   'server {' \
   '    listen 80;' \
@@ -30,7 +29,6 @@ RUN printf '%s\n' \
   '}' \
   > /etc/nginx/http.d/default.conf
 
-# php-fpm слушает localhost, отдаёт www-data
 RUN printf '%s\n' \
   '[www]' \
   'user = www-data' \
@@ -44,6 +42,4 @@ RUN printf '%s\n' \
   > /usr/local/etc/php-fpm.d/zz-deploy.conf
 
 WORKDIR /var/www/html
-
-# nginx на переднем плане + php-fpm, оба в одном контейнере
 CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]

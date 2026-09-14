@@ -405,17 +405,17 @@ func listServices() []string {
 
 // runnerNames — реальные контейнеры раннеров (а не только из compose).
 func runnerNames() []string {
-	out, err := exec.Command("docker", "ps", "-a", "--format", "{{.Names}}").Output()
+	out := []string{}
+	raw, err := exec.Command("docker", "ps", "-a", "--format", "{{.Names}}").Output()
 	if err != nil {
-		return nil
+		return out
 	}
-	var r []string
-	for _, n := range strings.Fields(string(out)) {
+	for _, n := range strings.Fields(string(raw)) {
 		if n == "runner" || strings.HasPrefix(n, "runner-") {
-			r = append(r, n)
+			out = append(out, n)
 		}
 	}
-	return r
+	return out
 }
 
 // ═══════════════════════════════════════════

@@ -23,6 +23,8 @@ services:
     image: deploy-stack:latest
     container_name: deploy-stack
     restart: unless-stopped
+    entrypoint: ["/deploy/deploy"]
+    command: ["serve", "--port", "3000"]
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:

@@ -1,6 +1,6 @@
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache nginx sqlite curl-dev oniguruma-dev
+RUN apk add --no-cache nginx sqlite-dev curl-dev oniguruma-dev
 
 # pdo_sqlite — нужна сборка; остальные (mbstring, opcache) уже в образе
 RUN docker-php-ext-install pdo_sqlite || true

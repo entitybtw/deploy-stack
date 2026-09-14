@@ -1,8 +1,10 @@
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache nginx sqlite curl-dev oniguruma-dev libzip-dev
+RUN apk add --no-cache nginx sqlite curl-dev oniguruma-dev
 
-RUN docker-php-ext-install mbstring opcache pdo_sqlite zip || true
+# pdo_sqlite — нужна сборка; остальные (mbstring, opcache) уже в образе
+RUN docker-php-ext-install pdo_sqlite || true
+RUN docker-php-ext-enable opcache mbstring
 
 RUN printf '%s\n' \
   'server {' \

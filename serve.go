@@ -437,6 +437,12 @@ func startWebServer(port int) {
 	mux.HandleFunc("/api/v1/servers", authReq(cl.handleServers))
 	mux.HandleFunc("/api/v1/servers/", authReq(cl.handleServer))
 
+	// ── Health (no auth) ──
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
 	// ── Status ──
 	mux.HandleFunc("/api/v1/status", authReq(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{

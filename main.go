@@ -392,7 +392,7 @@ func removeService(content, name string) string {
 }
 
 func listServices() []string {
-	var out []string
+	out := []string{}
 	for _, m := range regexp.MustCompile(`(?m)^  ([a-zA-Z0-9_.-]+):`).FindAllStringSubmatch(readCompose(), -1) {
 		switch m[1] {
 		case "services", "volumes", "networks":

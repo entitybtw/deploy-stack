@@ -38,6 +38,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./www:/var/www
       - ./deploy-data:/deploy
+      # шаблоны и статика менеджера — чтобы docker build брал их по HOST-путям
+      - ./templates:/deploy/templates:ro
+      - ./static:/deploy/static:ro
     labels:
       - "deploy-stack.role=panel"
     healthcheck:

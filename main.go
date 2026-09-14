@@ -438,13 +438,18 @@ func innerPort(lang LangInfo) int {
 }
 
 // prepareBuild создаёт .deploy.Dockerfile в каталоге сайта из шаблона
-// (для языков, которые собираются в образ). Репо может дать свой Dockerfile.
+// (для языков, которые собираются в образ). Так docker build берёт контекст
+// из папки сайта (host-путь, видимый демону), а не из внутренностей контейнера.
 func prepareBuild(dir string, lang LangInfo) error {
-	if lang.Name == "static" || lang.Name == "php" {
+	if lang.Name == "static" {
 		return nil
 	}
-	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
-		return nil
+	// Если репозиторий даёт собственный Dockerfile — используем его (кроме php,
+	// где legacy Dockerfile только с php-fpm ломает деплой).
+	if lang.Name != "php" {
+		if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
+			return nil
+		}
 	}
 	data, err := os.ReadFile(filepath.Join(resolveTemplatesDir(), lang.Template, "Dockerfile"))
 	if err != nil {
@@ -457,13 +462,26 @@ func prepareBuild(dir string, lang LangInfo) error {
 	return os.WriteFile(filepath.Join(dir, ".deploy.Dockerfile"), data, 0644)
 }
 
+// prepareStaticNginx кладёт nginx-конфиг в папку сайта (.deploy.nginx.conf),
+// чтобы контейнер монтировал host-путь, видимый docker-демону.
+func prepareStaticNginx(dir string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(resolveTemplatesDir(), "static", "nginx.conf"))
+	if err != nil {
+		return "", err
+	}
+	p := filepath.Join(dir, ".deploy.nginx.conf")
+	if err := os.WriteFile(p, data, 0644); err != nil {
+		return "", err
+	}
+	return p, nil
+}
+
 // ═══════════════════════════════════════════
 //  Service block
 // ═══════════════════════════════════════════
 
 func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
 	safe := serviceName(name)
-	tmpl := filepath.Join(resolveTemplatesDir(), lang.Template)
 	bind := os.Getenv("DEPLOY_BIND")
 	if bind == "" {
 		bind = "0.0.0.0"
@@ -482,18 +500,18 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     ports: ["%s:%d:80"]
     volumes:
       - %s:/usr/share/nginx/html:ro
-      - %s/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - %s/.deploy.nginx.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
       - "deploy-stack.site=%s"
-`, safe, safe, bind, port, dir, tmpl, name)
+`, safe, safe, bind, port, dir, dir, name)
 
 	case "php":
-		build := tmpl
-		if ownDockerfile {
-			build = dir
-		}
+		// Site-контекст: .deploy.Dockerfile (nginx + php-fpm) кладётся prepareBuild.
+		// Старый legacy Dockerfile репозитория (только php-fpm) игнорируется.
 		return fmt.Sprintf(`  %s:
-    build: %s
+    build:
+      context: %s
+      dockerfile: .deploy.Dockerfile
     container_name: %s
     restart: unless-stopped
     ports: ["%s:%d:80"]
@@ -502,7 +520,7 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
       - %s:/var/www/%s
     labels:
       - "deploy-stack.site=%s"
-`, safe, build, safe, bind, port, dir, dir, name, name)
+`, safe, dir, safe, bind, port, dir, dir, name, name)
 
 	default:
 		inner := innerPort(lang)
@@ -604,6 +622,11 @@ func runMigrations(svc, dir, name string) {
 
 // deploySite создаёт/обновляет сервис сайта и поднимает его. Возвращает фактический порт.
 func deploySite(name, dir string, port int, lang LangInfo) (int, error) {
+	if lang.Name == "static" {
+		if _, err := prepareStaticNginx(dir); err != nil {
+			return 0, fmt.Errorf("nginx-конфиг: %v", err)
+		}
+	}
 	if err := prepareBuild(dir, lang); err != nil {
 		return 0, err
 	}

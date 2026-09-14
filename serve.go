@@ -567,7 +567,7 @@ func listContainers(showAll bool) []map[string]interface{} {
 	}
 
 	// Batch: get all container names and statuses
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.Image}}")
 	out, err := cmd.CombinedOutput()
@@ -602,7 +602,7 @@ func listContainers(showAll bool) []map[string]interface{} {
 	}
 
 	// Batch: determine managed containers (label deploy-stack.site или mount /var/www)
-	if !showAll && len(all) > 0 {
+	if len(all) > 0 {
 		names := make([]string, len(all))
 		for i, c := range all { names[i] = c.Name }
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
@@ -633,7 +633,7 @@ func listContainers(showAll bool) []map[string]interface{} {
 		ports := ""
 		ctx3, cancel3 := context.WithTimeout(context.Background(), 3*time.Second)
 		portCmd := exec.CommandContext(ctx3, "docker", "inspect", "--format",
-			`{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{with index $conf 0}}{{.HostPort}}{{end}} {{end}}`, c.Name)
+			`{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{if $conf}}{{with index $conf 0}}{{.HostPort}}{{end}}{{end}} {{end}}`, c.Name)
 		portOut, _ := portCmd.CombinedOutput()
 		cancel3()
 		ports = strings.TrimSpace(string(portOut))

@@ -66,7 +66,12 @@ func (cs *ClusterStore) RemoveServer(id string) {
 	cs.save()
 }
 
-func (cs *ClusterStore) ListServers() []Server { return cs.servers }
+func (cs *ClusterStore) ListServers() []Server {
+	if cs.servers == nil {
+		return []Server{}
+	}
+	return cs.servers
+}
 
 func (cs *ClusterStore) GetServer(id string) *Server {
 	for i := range cs.servers {

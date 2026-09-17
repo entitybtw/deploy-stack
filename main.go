@@ -78,6 +78,55 @@ func runnerDataRoot() string {
 	return "/root/forgejo-runner"
 }
 
+// extraVolumesForSite — дополнительные rw-bind-тома для конкретного сайта.
+// Формат строки: <site>=<host-path>:<container-path>[:ro][,<host-path>:<container-path>...]
+// (site — имя сервиса). Читается из env DEPLOY_SITE_VOLUMES или файла
+// deployHome()/site-volumes.conf, чтобы не хардкодить секреты/ключи в коде.
+func extraVolumesForSite(safe string) []string {
+	raw := os.Getenv("DEPLOY_SITE_VOLUMES")
+	if raw == "" {
+		if data, err := os.ReadFile(filepath.Join(deployHome(), "site-volumes.conf")); err == nil {
+			raw = string(data)
+		}
+	}
+	var out []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		sep := strings.IndexAny(line, "=|")
+		if sep <= 0 {
+			continue
+		}
+		key := serviceName(strings.TrimSpace(line[:sep]))
+		if key != safe {
+			continue
+		}
+		for _, vol := range strings.Split(line[sep+1:], ",") {
+			if vol = strings.TrimSpace(vol); vol != "" {
+				out = append(out, vol)
+			}
+		}
+	}
+	return out
+}
+
+// siteVolumesBlock рендерит блок "volumes:" для docker-compose (с отступом 4 пробела),
+// включая дополнительные тома сайта. Возвращает "" если томов нет.
+func siteVolumesBlock(base []string, extra []string) string {
+	all := append(append([]string{}, base...), extra...)
+	if len(all) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("    volumes:\n")
+	for _, v := range all {
+		b.WriteString("      - " + v + "\n")
+	}
+	return b.String()
+}
+
 func prompt(msg string) string {
 	fmt.Print(msg)
 	s := bufio.NewScanner(os.Stdin)
@@ -493,21 +542,26 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
 
 	switch lang.Name {
 	case "static":
+		vols := siteVolumesBlock([]string{
+			dir + ":/usr/share/nginx/html:ro",
+			dir + "/.deploy.nginx.conf:/etc/nginx/conf.d/default.conf:ro",
+		}, extraVolumesForSite(safe))
 		return fmt.Sprintf(`  %s:
     image: nginx:alpine
     container_name: %s
     restart: unless-stopped
     ports: ["%s:%d:80"]
-    volumes:
-      - %s:/usr/share/nginx/html:ro
-      - %s/.deploy.nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    labels:
+%s    labels:
       - "deploy-stack.site=%s"
-`, safe, safe, bind, port, dir, dir, name)
+`, safe, safe, bind, port, vols, name)
 
 	case "php":
 		// Site-контекст: .deploy.Dockerfile (nginx + php-fpm) кладётся prepareBuild.
 		// Старый legacy Dockerfile репозитория (только php-fpm) игнорируется.
+		vols := siteVolumesBlock([]string{
+			dir + ":/var/www/html",
+			dir + ":/var/www/" + name,
+		}, extraVolumesForSite(safe))
 		return fmt.Sprintf(`  %s:
     build:
       context: %s
@@ -515,12 +569,9 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     container_name: %s
     restart: unless-stopped
     ports: ["%s:%d:80"]
-    volumes:
-      - %s:/var/www/html
-      - %s:/var/www/%s
-    labels:
+%s    labels:
       - "deploy-stack.site=%s"
-`, safe, dir, safe, bind, port, dir, dir, name, name)
+`, safe, dir, safe, bind, port, vols, name)
 
 	default:
 		inner := innerPort(lang)
@@ -528,6 +579,7 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
 		if ownDockerfile {
 			df = "Dockerfile"
 		}
+		vols := siteVolumesBlock(nil, extraVolumesForSite(safe))
 		return fmt.Sprintf(`  %s:
     build:
       context: %s
@@ -537,9 +589,9 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     ports: ["%s:%d:%d"]
     environment:
       - PORT=%d
-    labels:
+%s    labels:
       - "deploy-stack.site=%s"
-`, safe, dir, df, safe, bind, port, inner, inner, name)
+`, safe, dir, df, safe, bind, port, inner, inner, vols, name)
 	}
 }
 

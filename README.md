@@ -141,6 +141,27 @@ PORT=8084
 TYPE=static      # static | php | python | node | go
 ```
 
+### Доп. тома для конкретного сайта (ключи/секреты)
+
+Чтобы не раздавать секреты всем сайтам, дополнительные bind-тома задаются
+точечно в файле `site-volumes.conf` рядом с бинарём (`DEPLOY_HOME`) или в
+переменной `DEPLOY_SITE_VOLUMES`. Формат строки:
+
+```
+<имя-сервиса>=<host-path>:<container-path>[:ro][,<host-path>:<container-path>...]
+```
+
+Пример — приватный SSH-ключ только для одного сайта:
+
+```
+panel=/etc/ssh/reverse.key:/etc/deploy-secrets/reverse.key:ro
+```
+
+PHP-контейнер при старте копирует `/etc/deploy-secrets/*` в `/etc/ssh/`
+с правами `www-data:www-data 0600`, поэтому `ssh`/`rsync` из PHP работают
+и не ругаются на «too open permissions».
+Файл `site-volumes.conf` в git не попадает (см. `.gitignore`).
+
 
 ## API
 

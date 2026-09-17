@@ -10,3 +10,6 @@ runner/
 sites/
 runners/
 data/
+
+# доп. тома сайтов (ключи/секреты) — только на хосте
+site-volumes.conf

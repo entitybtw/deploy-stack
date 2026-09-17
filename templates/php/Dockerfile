@@ -1,6 +1,6 @@
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache nginx sqlite-dev curl-dev oniguruma-dev
+RUN apk add --no-cache nginx sqlite-dev curl-dev oniguruma-dev openssh-client rsync
 
 # pdo_sqlite нужно собрать; mbstring и opcache уже включены в образ
 RUN docker-php-ext-install pdo_sqlite || true
@@ -43,4 +43,9 @@ RUN printf '%s\n' \
   > /usr/local/etc/php-fpm.d/zz-deploy.conf
 
 WORKDIR /var/www/html
-CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
+
+# Секреты (напр. приватный SSH-ключ), смонтированные в /etc/deploy-secrets,
+# копируются в /etc/ssh с правами www-data (0600), чтобы ssh/rsync из PHP
+# работали и не ругались на "too open permissions". Если каталога нет — шаг
+# пропускается. Монтируется только нужным сайтам (см. site-volumes.conf).
+CMD ["sh", "-c", "if [ -d /etc/deploy-secrets ]; then mkdir -p /etc/ssh && cp -a /etc/deploy-secrets/. /etc/ssh/ && chown -R www-data:www-data /etc/ssh && find /etc/ssh -type f -exec chmod 600 {} +; fi; php-fpm -D && nginx -g 'daemon off;'"]

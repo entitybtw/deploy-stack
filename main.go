@@ -36,11 +36,26 @@ func deployHome() string {
 }
 
 // composePath — файл, в котором живут сервисы сайтов (отдельно от стека панели).
+// Если сконфигурированный путь недоступен (родительский каталог не существует —
+// типичная ситуация, когда контейнеру не смонтировали ./sites), падаем обратно
+// на deployHome()/sites/docker-compose.yml, а не молча пишем в пустоту.
+// Иначе панель и раннер правят разные файлы («split brain»): UI не видит сайтов,
+// хотя контейнеры живы.
 func composePath() string {
-	if p := os.Getenv("DEPLOY_SITES"); p != "" {
-		return filepath.Clean(p)
+	p := os.Getenv("DEPLOY_SITES")
+	if p == "" {
+		return filepath.Join(deployHome(), "sites", "docker-compose.yml")
 	}
-	return filepath.Join(deployHome(), "sites", "docker-compose.yml")
+	p = filepath.Clean(p)
+	if fi, err := os.Stat(filepath.Dir(p)); err == nil && fi.IsDir() {
+		return p
+	}
+	fallback := filepath.Join(deployHome(), "sites", "docker-compose.yml")
+	if filepath.Clean(fallback) == p {
+		return p
+	}
+	os.MkdirAll(filepath.Dir(fallback), 0755)
+	return fallback
 }
 
 // runnersComposePath — файл, в котором живут сервисы CI-раннеров.
@@ -71,11 +86,92 @@ func resolveTemplatesDir() string {
 }
 
 // runnerDataRoot — корень данных Forgejo-runner'ов (config.yaml/.runner).
+// В контейнере путь задаётся RUNNER_DATA (=/runner), но на разных хостах
+// исторически разложены разные каталоги. Поэтому если в сконфигурированном
+// пути нет .runner, ищем среди типовых мест — иначе панель показывает пустые
+// labels у работающих раннеров.
 func runnerDataRoot() string {
 	if h := os.Getenv("RUNNER_DATA"); h != "" {
-		return filepath.Clean(h)
+		h = filepath.Clean(h)
+		if runnerDataExists(h) {
+			return h
+		}
+		for _, c := range runnerDataCandidates() {
+			if runnerDataExists(c) {
+				return c
+			}
+		}
+		return h
+	}
+	for _, c := range runnerDataCandidates() {
+		if runnerDataExists(c) {
+			return c
+		}
 	}
 	return "/root/forgejo-runner"
+}
+
+// runnerDataCandidates — типовые каталоги данных раннера.
+func runnerDataCandidates() []string {
+	c := []string{"/root/forgejo-runner", "/root/forgejo-runner/data", "/runner", "/runner/data"}
+	if h := os.Getenv("DEPLOY_HOME"); h != "" {
+		c = append(c, filepath.Join(h, "runner"), filepath.Join(h, "runner", "data"))
+	}
+	c = append(c, filepath.Join(deployHome(), "runner"), filepath.Join(deployHome(), "runner", "data"))
+	return c
+}
+
+// runnerDataExists — есть ли уже зарегистрированный раннер в каталоге root
+// (сам .runner или подкаталог runner/.runner).
+func runnerDataExists(root string) bool {
+	for _, p := range []string{
+		filepath.Join(root, ".runner"),
+		filepath.Join(root, "data", ".runner"),
+		filepath.Join(root, "runner", ".runner"),
+	} {
+		if _, err := os.Stat(p); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// runnerConfigFile возвращает путь к .runner-файлу конкретного раннера
+// (containerName == "runner" — единственный/легаси раннер). Ищет по всем
+// типовым раскладкам, чтобы UI показывал labels независимо от того, куда
+// исторически положили данные.
+func runnerConfigFile(containerName string) string {
+	roots := []string{}
+	if h := os.Getenv("RUNNER_DATA"); h != "" {
+		roots = append(roots, filepath.Clean(h))
+	}
+	roots = append(roots, runnerDataCandidates()...)
+
+	var candidates []string
+	for _, r := range roots {
+		if containerName == "runner" {
+			candidates = append(candidates,
+				filepath.Join(r, ".runner"),
+				filepath.Join(r, "data", ".runner"),
+				filepath.Join(r, "runner", ".runner"),
+			)
+		} else {
+			candidates = append(candidates,
+				filepath.Join(r, "data", containerName, ".runner"),
+				filepath.Join(r, containerName, ".runner"),
+				filepath.Join(r, "runner", containerName, ".runner"),
+			)
+		}
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	if len(candidates) > 0 {
+		return candidates[0]
+	}
+	return ""
 }
 
 // extraVolumesForSite — дополнительные rw-bind-тома для конкретного сайта.
@@ -359,8 +455,13 @@ func detectDB(dir string) string {
 var serviceNameRe = regexp.MustCompile(`[^a-z0-9_.-]+`)
 
 // serviceName превращает имя сайта в валидное имя docker-сервиса.
+// Docker требует, чтобы имя контейнера начиналось с [a-zA-Z0-9] и состояло
+// только из [a-zA-Z0-9_.-]. Регексп выше пропускает '_' и '.', поэтому
+// дополнительно срезаем ведущие недопустимые символы — иначе `docker compose up`
+// падает с "Invalid container name" и деплой не проходит вообще.
 func serviceName(name string) string {
 	s := serviceNameRe.ReplaceAllString(strings.ToLower(name), "-")
+	s = strings.TrimLeft(s, "-._")
 	s = strings.Trim(s, "-.")
 	if s == "" {
 		s = "site"
@@ -413,31 +514,72 @@ func insertService(content, block string) string {
 	return strings.TrimRight(content, "\n") + "\n" + block + "\n"
 }
 
+// removeService вырезает блок сервиса по имени (плюс варианты с суффиксом
+// языка: -php, -node ...). Блок сервиса — строка `  <name>:` и все строки,
+// которые следуют с бо́льшим отступом. Обрезка останавливается на первом
+// строке с нулевым отступом (services: / volumes: / networks:) или пустой
+// строке, чтобы НЕ задеть соседние секции compose.
+// Предыдущая реализация искала позицию регекспом и шла вперёд посимвольно,
+// из-за чего пустая строка внутри блока или пустая строка перед volumes:
+// обрывала его посередине и могла уронить остальные сервисы.
 func removeService(content, name string) string {
-	candidates := []string{name}
-	for _, suffix := range []string{"-php", "-node", "-go", "-python", "-rust", "-jvm", "-dotnet", "-ruby", "-bun", "-deno"} {
-		candidates = append(candidates, name+suffix)
+	candidates := map[string]bool{}
+	for _, s := range []string{name} {
+		candidates[s] = true
 	}
-	for _, s := range candidates {
-		re := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(s) + `:.*`)
-		loc := re.FindStringIndex(content)
-		if loc == nil {
+	for _, suffix := range []string{"-php", "-node", "-go", "-python", "-rust", "-jvm", "-dotnet", "-ruby", "-bun", "-deno", "-docker"} {
+		candidates[name+suffix] = true
+	}
+
+	lines := strings.Split(content, "\n")
+	inServices := false
+	out := make([]string, 0, len(lines))
+	skip := false
+
+	for _, line := range lines {
+		ind := len(line) - len(strings.TrimLeft(line, " \t"))
+		trimmed := strings.TrimSpace(line)
+		isBlank := trimmed == ""
+
+		if ind == 0 {
+			// новый топ-уровневый ключ
+			inServices = strings.HasPrefix(trimmed, "services")
+			skip = false
+			if isBlank {
+				out = append(out, line)
+			} else {
+				out = append(out, line)
+			}
 			continue
 		}
-		start, end := loc[0], loc[1]
-		for end < len(content) {
-			if content[end] == '\n' {
-				if end+1 < len(content) && content[end+1] == ' ' {
-					end++
-					continue
-				}
-				break
+
+		if !inServices || isBlank {
+			if isBlank && skip {
+				continue
 			}
-			end++
+			out = append(out, line)
+			continue
 		}
-		content = content[:start] + content[end:]
+
+		// уровень сервиса = 2 пробела
+		if ind <= 2 {
+			key := strings.TrimSuffix(trimmed, ":")
+			if candidates[key] {
+				skip = true
+				continue
+			}
+			skip = false
+		}
+
+		if !skip {
+			out = append(out, line)
+		}
 	}
-	return content
+
+	cleaned := strings.Join(out, "\n")
+	// уберём «подвисшие» пустые строки в начале блока services:
+	cleaned = strings.ReplaceAll(cleaned, "services:\n\n  ", "services:\n  ")
+	return cleaned
 }
 
 func listServices() []string {

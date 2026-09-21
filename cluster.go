@@ -13,14 +13,14 @@ import (
 )
 
 type Server struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	Pass     string `json:"pass"`
-	Token    string `json:"token,omitempty"`
-	Online   bool   `json:"online"`
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Host     string    `json:"host"`
+	Port     int       `json:"port"`
+	User     string    `json:"user"`
+	Pass     string    `json:"pass"`
+	Token    string    `json:"token,omitempty"`
+	Online   bool      `json:"online"`
 	LastPing time.Time `json:"last_ping"`
 }
 
@@ -221,7 +221,9 @@ func (cl *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "invalid json", 400)
 			return
 		}
-		if req.Port == 0 { req.Port = 3000 }
+		if req.Port == 0 {
+			req.Port = 3000
+		}
 		s := cl.store.AddServer(req.Name, req.Host, req.Port, req.User, req.Pass)
 		cl.store.LoginServer(s.ID)
 		jsonResp(w, map[string]string{"status": "added", "id": s.ID})
@@ -240,20 +242,20 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	if len(parts) >= 2 {
 		action := parts[1]
 
-	// ── агрегированная сводка сервера ──
-	if action == "status" && r.Method == "GET" {
-		data, err := cl.store.CallServer(id, "GET", "/api/v1/status", nil)
-		if err != nil {
-			jsonErr(w, err.Error(), 502)
+		// ── агрегированная сводка сервера ──
+		if action == "status" && r.Method == "GET" {
+			data, err := cl.store.CallServer(id, "GET", "/api/v1/status", nil)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
-		return
-	}
 
-	// GET /servers/:id/containers
-	if action == "containers" && r.Method == "GET" {
+		// GET /servers/:id/containers
+		if action == "containers" && r.Method == "GET" {
 			data, err := cl.store.CallServer(id, "GET", "/api/v1/containers?show_all=true", nil)
 			if err != nil {
 				jsonErr(w, err.Error(), 502)

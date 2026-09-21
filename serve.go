@@ -292,12 +292,7 @@ func startWebServer(port int) {
 		name := strings.TrimPrefix(r.URL.Path, "/api/v1/sites/")
 		if strings.HasSuffix(name, "/remove") && r.Method == "DELETE" {
 			name = strings.TrimSuffix(name, "/remove")
-			for _, s := range []string{name, name + "-php"} {
-				dockerCompose("down", s)
-			}
-			c := readCompose()
-			c = removeService(c, name)
-			writeCompose(c)
+			removeSite(serviceName(name))
 			jsonResp(w, map[string]string{"status": "removed"})
 			return
 		}
@@ -677,7 +672,16 @@ func listContainers(showAll bool) []map[string]interface{} {
 			`{{range $p, $conf := .NetworkSettings.Ports}}{{with $conf}}{{range .}}{{.HostPort}}->{{$p}} {{end}}{{end}}{{end}}`, c.Name)
 		portOut, _ := portCmd.CombinedOutput()
 		cancel3()
-		ports = strings.TrimSpace(string(portOut))
+		// один и тот же маппинг приходит и для IPv4, и для IPv6 — дедуплицируем
+		seen := map[string]bool{}
+		var uniq []string
+		for _, f := range strings.Fields(string(portOut)) {
+			if !seen[f] {
+				seen[f] = true
+				uniq = append(uniq, f)
+			}
+		}
+		ports = strings.Join(uniq, " ")
 
 		containers = append(containers, map[string]interface{}{
 			"name":    c.Name,

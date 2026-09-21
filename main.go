@@ -1109,9 +1109,20 @@ func interactive() {
 	fmt.Printf("\n  ✓ %s deployed: http://%s:%d\n", name, hostIP(), actual)
 }
 
-// ═══════════════════════════════════════════
-//  Main
-// ═══════════════════════════════════════════
+// removeSite останавливает и удаляет ОДИН сервис сайта и вычищает его из compose.
+// ВАЖНО: без --remove-orphans. Раньше `docker compose down --remove-orphans <svc>`
+// сносил ВСЕ контейнеры проекта, которых не было в (возможно устаревшем/пустом)
+// compose-файле — то есть удаление одного сайта убивало остальные.
+func removeSite(n string) {
+	// сначала пробуем штатное удаление через compose, затем добиваем контейнер
+	dockerCompose("rm", "-s", "-f", n)
+	exec.Command("docker", "rm", "-f", n).Run()
+	writeCompose(removeService(readCompose(), n))
+}
+
+func removeAllSites() {
+	dockerCompose("down")
+}
 
 func usage() {
 	fmt.Print(`deploy-stack — Universal site deployer
@@ -1192,8 +1203,7 @@ func main() {
 			return
 		}
 		n := serviceName(args[1])
-		dockerCompose("down", "--remove-orphans", n)
-		writeCompose(removeService(readCompose(), n))
+		removeSite(n)
 		fmt.Printf("✓ %s removed\n", n)
 
 	case "list":
@@ -1273,7 +1283,7 @@ func main() {
 		}
 
 	case "down":
-		dockerCompose("down", "--remove-orphans")
+		removeAllSites()
 
 	case "deploy", "auto":
 		autoDeploy(args[1:])

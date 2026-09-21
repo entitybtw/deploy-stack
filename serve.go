@@ -121,7 +121,9 @@ func startWebServer(port int) {
 		if strings.HasSuffix(name, "/logs") {
 			name = strings.TrimSuffix(name, "/logs")
 			tail := "200"
-			if t := r.URL.Query().Get("tail"); t != "" { tail = t }
+			if t := r.URL.Query().Get("tail"); t != "" {
+				tail = t
+			}
 			w.Header().Set("Content-Type", "text/plain")
 			cmd := exec.Command("docker", "logs", "--tail", tail, name)
 			out, _ := cmd.CombinedOutput()
@@ -155,9 +157,13 @@ func startWebServer(port int) {
 					n, err := stdout.Read(buf)
 					if n > 0 {
 						w.Write(buf[:n])
-						if ok { flusher.Flush() }
+						if ok {
+							flusher.Flush()
+						}
 					}
-					if err != nil { break }
+					if err != nil {
+						break
+					}
 				}
 			}()
 			go func() {
@@ -165,9 +171,13 @@ func startWebServer(port int) {
 					n, err := stderr.Read(buf)
 					if n > 0 {
 						w.Write(buf[:n])
-						if ok { flusher.Flush() }
+						if ok {
+							flusher.Flush()
+						}
 					}
-					if err != nil { break }
+					if err != nil {
+						break
+					}
 				}
 			}()
 			cmd.Wait()
@@ -298,7 +308,7 @@ func startWebServer(port int) {
 	mux.HandleFunc("/api/v1/runners", authReq(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			names := runnerNames()
-			var runners []map[string]interface{}
+			runners := make([]map[string]interface{}, 0, len(names))
 			for _, name := range names {
 				status := getContainerStatus(name)
 				image := ""
@@ -315,10 +325,7 @@ func startWebServer(port int) {
 					_ = content
 				}
 				// Read from .runner file for labels
-				runnerFile := filepath.Join(runnerDataRoot(), "data", ".runner")
-				if name != "runner" {
-					runnerFile = filepath.Join(runnerDataRoot(), "data", name, ".runner")
-				}
+				runnerFile := runnerConfigFile(name)
 				if data, err := os.ReadFile(runnerFile); err == nil {
 					var rf struct {
 						Labels []string `json:"labels"`
@@ -351,9 +358,15 @@ func startWebServer(port int) {
 			jsonErr(w, "invalid json", 400)
 			return
 		}
-		if req.Capacity == 0 { req.Capacity = 1 }
-		if req.Platform == "" { req.Platform = "forgejo" }
-		if req.URL == "" { req.URL = "http://10.0.0.1:3000" }
+		if req.Capacity == 0 {
+			req.Capacity = 1
+		}
+		if req.Platform == "" {
+			req.Platform = "forgejo"
+		}
+		if req.URL == "" {
+			req.URL = "http://10.0.0.1:3000"
+		}
 		addRunner(req.Name, req.Token, req.URL)
 		jsonResp(w, map[string]string{"status": "created", "name": req.Name})
 	}))
@@ -399,10 +412,7 @@ func startWebServer(port int) {
 				return
 			}
 			// Update .runner file labels - preserve all other fields
-			runnerFile := filepath.Join(runnerDataRoot(), "data", ".runner")
-			if name != "runner" {
-				runnerFile = filepath.Join(runnerDataRoot(), "data", name, ".runner")
-			}
+			runnerFile := runnerConfigFile(name)
 			data, err := os.ReadFile(runnerFile)
 			if err != nil {
 				jsonErr(w, "runner config not found", 404)
@@ -410,10 +420,11 @@ func startWebServer(port int) {
 			}
 			var rf map[string]interface{}
 			json.Unmarshal(data, &rf)
-			rf["labels"] = strings.Split(req.Labels, ",")
-			labels := rf["labels"].([]string)
-			for i := range labels {
-				labels[i] = strings.TrimSpace(labels[i])
+			var labels []string
+			for _, l := range strings.Split(req.Labels, ",") {
+				if l = strings.TrimSpace(l); l != "" {
+					labels = append(labels, l)
+				}
 			}
 			rf["labels"] = labels
 			newData, _ := json.MarshalIndent(rf, "", "  ")
@@ -552,7 +563,9 @@ func getContainerImage(name string) string {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.Config.Image}}", name)
 	out, err := cmd.Output()
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	return strings.TrimSpace(string(out))
 }
 
@@ -561,7 +574,9 @@ func getContainerPorts(name string) string {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{range $conf}}{{.HostPort}}{{end}} {{end}}", name)
 	out, err := cmd.Output()
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	return strings.TrimSpace(string(out))
 }
 
@@ -596,13 +611,21 @@ func listContainers(showAll bool) []map[string]interface{} {
 	seen := make(map[string]bool)
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		parts := strings.SplitN(line, "|", 3)
-		if len(parts) < 1 { continue }
+		if len(parts) < 1 {
+			continue
+		}
 		name := parts[0]
 		status := ""
 		image := ""
-		if len(parts) > 1 { status = parts[1] }
-		if len(parts) > 2 { image = parts[2] }
-		if seen[name] { continue }
+		if len(parts) > 1 {
+			status = parts[1]
+		}
+		if len(parts) > 2 {
+			image = parts[2]
+		}
+		if seen[name] {
+			continue
+		}
 		seen[name] = true
 		all = append(all, rawContainer{Name: name, Status: status, Image: image})
 	}
@@ -610,7 +633,9 @@ func listContainers(showAll bool) []map[string]interface{} {
 	// Batch: determine managed containers (label deploy-stack.site или mount /var/www)
 	if len(all) > 0 {
 		names := make([]string, len(all))
-		for i, c := range all { names[i] = c.Name }
+		for i, c := range all {
+			names[i] = c.Name
+		}
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel2()
 		inspectCmd := exec.CommandContext(ctx2, "docker", "inspect", "--format",
@@ -619,7 +644,9 @@ func listContainers(showAll bool) []map[string]interface{} {
 		mountOut, _ = inspectCmd.CombinedOutput()
 		for _, line := range strings.Split(strings.TrimSpace(string(mountOut)), "\n") {
 			parts := strings.SplitN(line, "|", 3)
-			if len(parts) < 3 { continue }
+			if len(parts) < 3 {
+				continue
+			}
 			name := strings.TrimPrefix(parts[0], "/")
 			label := strings.TrimSpace(parts[1])
 			mounts := parts[2]
@@ -630,16 +657,24 @@ func listContainers(showAll bool) []map[string]interface{} {
 	}
 
 	for _, c := range all {
-		if !showAll && infra[c.Name] { continue }
-		if !showAll && strings.HasPrefix(c.Name, "runner-") { continue }
+		if !showAll && infra[c.Name] {
+			continue
+		}
+		if !showAll && strings.HasPrefix(c.Name, "runner-") {
+			continue
+		}
 		if !showAll {
-			if _, ok := mountMap[c.Name]; !ok { continue }
+			if _, ok := mountMap[c.Name]; !ok {
+				continue
+			}
 		}
 
 		ports := ""
 		ctx3, cancel3 := context.WithTimeout(context.Background(), 3*time.Second)
+		// показываем только реально опубликованные маппинги (host->container),
+		// а не expose-порты без биндинга — иначе в UI видно мусор вида "9000/tcp->".
 		portCmd := exec.CommandContext(ctx3, "docker", "inspect", "--format",
-			`{{range $p, $conf := .NetworkSettings.Ports}}{{$p}}->{{if $conf}}{{with index $conf 0}}{{.HostPort}}{{end}}{{end}} {{end}}`, c.Name)
+			`{{range $p, $conf := .NetworkSettings.Ports}}{{with $conf}}{{range .}}{{.HostPort}}->{{$p}} {{end}}{{end}}{{end}}`, c.Name)
 		portOut, _ := portCmd.CombinedOutput()
 		cancel3()
 		ports = strings.TrimSpace(string(portOut))
@@ -662,7 +697,10 @@ func recreateContainer(name string, newPort int, hostPath, hostIP, typ string) e
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	type mountInfo struct{ Src, Dst string; RW bool }
+	type mountInfo struct {
+		Src, Dst string
+		RW       bool
+	}
 
 	// 1. Получаем образ, сборку bind-маунтов и внутренний порт.
 	get := func(sep string, args ...string) string {
@@ -678,8 +716,14 @@ func recreateContainer(name string, newPort int, hostPath, hostIP, typ string) e
 	exposedStr := get("{{range $p, $_ := .Config.ExposedPorts}}{{$p}} {{end}}", name)
 	innerPort := "80"
 	for _, e := range strings.Fields(exposedStr) {
-		if strings.HasPrefix(e, "80") { innerPort = "80"; break }
-		if p := strings.Split(e, "/")[0]; p != "" { innerPort = p; break }
+		if strings.HasPrefix(e, "80") {
+			innerPort = "80"
+			break
+		}
+		if p := strings.Split(e, "/")[0]; p != "" {
+			innerPort = p
+			break
+		}
 	}
 
 	// bind-маунты host-папки (Type=bind)
@@ -694,7 +738,9 @@ func recreateContainer(name string, newPort int, hostPath, hostIP, typ string) e
 		}
 		if json.Unmarshal([]byte(mountsJSON), &ms) == nil {
 			for _, m := range ms {
-				if m.Type != "bind" { continue }
+				if m.Type != "bind" {
+					continue
+				}
 				src := m.Source
 				if hostPath != "" && (m.Dest == "/usr/share/nginx/html" || m.Dest == "/var/www/html") {
 					src = hostPath
@@ -709,16 +755,25 @@ func recreateContainer(name string, newPort int, hostPath, hostIP, typ string) e
 	if hostPort == 0 {
 		pb := get("{{json .NetworkSettings.Ports}}", name)
 		if pb != "" {
-			var ports map[string][]struct{ HostPort string `json:"HostPort"` }
+			var ports map[string][]struct {
+				HostPort string `json:"HostPort"`
+			}
 			if json.Unmarshal([]byte(pb), &ports) == nil {
 				for _, arr := range ports {
-					if len(arr) > 0 { fmt.Sscanf(arr[0].HostPort, "%d", &hostPort); break }
+					if len(arr) > 0 {
+						fmt.Sscanf(arr[0].HostPort, "%d", &hostPort)
+						break
+					}
 				}
 			}
 		}
-		if hostPort == 0 { hostPort = 8080 }
+		if hostPort == 0 {
+			hostPort = 8080
+		}
 	}
-	if hostIP == "" { hostIP = "0.0.0.0" }
+	if hostIP == "" {
+		hostIP = "0.0.0.0"
+	}
 
 	_ = typ
 	if len(binds) == 0 {
@@ -741,7 +796,9 @@ func recreateContainer(name string, newPort int, hostPath, hostIP, typ string) e
 	args = append(args, "-p", fmt.Sprintf("%s:%d:%s", hostIP, hostPort, innerPort))
 	for _, b := range binds {
 		roSuffix := ""
-		if !b.RW { roSuffix = ":ro" }
+		if !b.RW {
+			roSuffix = ":ro"
+		}
 		args = append(args, "-v", b.Src+":"+b.Dst+roSuffix)
 	}
 	args = append(args, image)

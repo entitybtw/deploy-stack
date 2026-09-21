@@ -33,7 +33,7 @@ else
   echo "• .env уже существует — оставляю как есть"
 fi
 
-mkdir -p deploy-data www
+mkdir -p deploy-data www sites runners data forgejo-runner
 
 # shellcheck disable=SC1091
 . ./.env 2>/dev/null || true

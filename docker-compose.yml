@@ -39,7 +39,18 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./www:/var/www
+      # ── состояние стека живёт на ХОСТЕ, а не внутри анонимного тома ──
+      # ВАЖНО: sites/ и runners/ монтируются ОТДЕЛЬНО, чтобы панель и раннер
+      # правили один и тот же compose. Иначе панель пишет в /deploy/sites внутри
+      # своего тома, а раннер — в /root/deploy-stack/sites на хосте: получается
+      # «split brain» — список сайтов в UI пустой, хотя контейнеры живы.
       - ./deploy-data:/deploy
+      - ./sites:/deploy/sites
+      - ./runners:/deploy/runners
+      - ./data:/deploy/data
+      # данные Forgejo-раннеров (labels в UI). На хосте это /root/forgejo-runner,
+      # внутри — /runner (RUNNER_DATA). Директория создаётся install.sh.
+      - ./forgejo-runner:/runner
       # шаблоны и статика менеджера — чтобы docker build брал их по HOST-путям
       - ./templates:/deploy/templates:ro
       - ./static:/deploy/static
@@ -65,8 +76,11 @@ services:
       - ./runner:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - ./www:/var/www
-      # менеджер целиком — ради бинаря deploy и шаблонов
+      # менеджер — ради бинаря deploy и шаблонов
       - ./deploy-data:/deploy
+      # тот же sites/, что у панели: раннер деплоит в общий compose
+      - ./sites:/deploy/sites
+      - ./data:/deploy/data
     environment:
       DEPLOY_HOME: /deploy
       DEPLOY_SITES: /deploy/sites/docker-compose.yml

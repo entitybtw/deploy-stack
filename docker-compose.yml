@@ -49,8 +49,9 @@ services:
       - ./runners:/deploy/runners
       - ./data:/deploy/data
       # данные Forgejo-раннеров (labels в UI). На хосте это /root/forgejo-runner,
-      # внутри — /runner (RUNNER_DATA). Директория создаётся install.sh.
-      - ./forgejo-runner:/runner
+      # внутри — /runner (RUNNER_DATA). Директорию можно переопределить:
+      #   RUNNER_DATA_HOST=/root/forgejo-runner  в .env
+      - ${RUNNER_DATA_HOST:-./forgejo-runner}:/runner
       # шаблоны и статика менеджера — чтобы docker build брал их по HOST-путям
       - ./templates:/deploy/templates:ro
       - ./static:/deploy/static

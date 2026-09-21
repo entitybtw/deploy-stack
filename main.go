@@ -66,13 +66,40 @@ func runnersComposePath() string {
 	return filepath.Join(deployHome(), "runners", "docker-compose.yml")
 }
 
-// templatesSearch returns candidate host dirs with Dockerfile/nginx-шаблонов.
+// templatesSearch returns candidate dirs with Dockerfile/nginx-шаблонов.
+// Раньше список был только от deployHome()/os.Args[0], поэтому при запуске
+// из CI-раннера (symlink /usr/local/bin/deploy -> /root/deploy-stack/deploy)
+// каталог шаблонов не находился и статик-деплой падал с
+// "open templates/static/nginx.conf: no such file or directory".
+// Теперь дополнительно резолвим реальный путь бинаря (через symlink) и
+// проверяем типовые места установки.
 func templatesSearch() []string {
-	return []string{
-		filepath.Join(deployHome(), "templates"),
-		"/usr/local/share/deploy-stack/templates",
-		filepath.Join(filepath.Dir(os.Args[0]), "templates"),
+	var cands []string
+	add := func(p string) {
+		p = filepath.Clean(p)
+		for _, c := range cands {
+			if c == p {
+				return
+			}
+		}
+		cands = append(cands, p)
 	}
+
+	add(filepath.Join(deployHome(), "templates"))
+	// реальный путь исполняемого файла со снятым symlink
+	if exe, err := os.Executable(); err == nil {
+		if real, err := filepath.EvalSymlinks(exe); err == nil {
+			add(filepath.Join(filepath.Dir(real), "templates"))
+		}
+		add(filepath.Join(filepath.Dir(exe), "templates"))
+	}
+	add(filepath.Join(filepath.Dir(os.Args[0]), "templates"))
+	add("/usr/local/share/deploy-stack/templates")
+	add("/root/deploy-stack/templates")
+	if h := os.Getenv("DEPLOY_HOME"); h != "" {
+		add(filepath.Join(h, "templates"))
+	}
+	return cands
 }
 
 // resolveTemplatesDir picks 1-ю существующую templates-папку, иначе дефолт в DEPLOY_HOME.

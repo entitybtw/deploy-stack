@@ -230,8 +230,17 @@ func prompt(msg string) string {
 	return strings.TrimSpace(s.Text())
 }
 
+// isCI — запущены ли мы внутри CI-раннера. Forgejo/Gitea host-executor
+// экспортирует CI=true, GITEA_ACTIONS=true, ACTIONS_RUNTIME_TOKEN и т.п.
+// Проверяем набор признаков: если хоть один есть — работаем авто, без интерактива
+// (иначе deploy напечатает меню и повиснет, ожидая stdin, до таймаута джобы).
 func isCI() bool {
-	return os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("DEPLOY_AUTO") != ""
+	for _, k := range []string{"CI", "GITHUB_ACTIONS", "GITEA_ACTIONS", "ACTIONS_RUNTIME_TOKEN", "ACTIONS_CACHE_URL", "DEPLOY_AUTO"} {
+		if os.Getenv(k) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func isTTY() bool {

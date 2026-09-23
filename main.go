@@ -799,6 +799,9 @@ func syncDir(src, dst string) error {
 		cmd := exec.Command("rsync", "-a", "--delete",
 			"--exclude=.git", "--exclude=*.db", "--exclude=*.sqlite", "--exclude=*.sqlite3",
 			"--exclude=*.db-wal", "--exclude=*.db-shm", "--exclude=.deploy.Dockerfile",
+			"--exclude=.env", "--exclude=*.env", "--exclude=.env.*",
+			"--exclude=data/", "--exclude=uploads/", "--exclude=.ssh/",
+			"--exclude=cache/", "--exclude=access_requests.json",
 			src+"/", dst+"/")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("rsync: %v: %s", err, strings.TrimSpace(string(out)))
@@ -809,6 +812,23 @@ func syncDir(src, dst string) error {
 }
 
 func copyTree(src, dst string) error {
+	persistent := func(rel string) bool {
+		base := filepath.Base(rel)
+		switch {
+		case base == ".env", base == ".git", base == ".deploy.Dockerfile",
+			base == "cache", base == "access_requests.json":
+			return true
+		case strings.HasSuffix(base, ".db") || strings.HasSuffix(base, ".sqlite") ||
+			strings.HasSuffix(base, ".sqlite3") || strings.HasSuffix(base, ".db-wal") ||
+			strings.HasSuffix(base, ".db-shm") || strings.HasSuffix(base, ".env"):
+			return true
+		case rel == "data" || strings.HasPrefix(rel, "data/") ||
+			rel == "uploads" || strings.HasPrefix(rel, "uploads/") ||
+			rel == ".ssh" || strings.HasPrefix(rel, ".ssh/"):
+			return true
+		}
+		return false
+	}
 	return filepath.Walk(src, func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -817,10 +837,13 @@ func copyTree(src, dst string) error {
 		if rel == "." {
 			return nil
 		}
-		if fi.IsDir() {
-			if fi.Name() == ".git" {
+		if persistent(rel) {
+			if fi.IsDir() {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if fi.IsDir() {
 			return os.MkdirAll(filepath.Join(dst, rel), 0755)
 		}
 		data, err := os.ReadFile(p)

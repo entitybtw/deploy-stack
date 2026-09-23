@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -233,6 +234,103 @@ func extraVolumesForSite(safe string) []string {
 		}
 	}
 	return out
+}
+
+// SiteCustom — пользовательская кастомизация контейнера сайта:
+// пакеты/тулы (apk), переменные окружения и дополнительные тома.
+// Хранится в deployHome()/site-custom.json по ключу serviceName(site).
+type SiteCustom struct {
+	Tools   []string          `json:"tools,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+	Volumes []string          `json:"volumes,omitempty"`
+}
+
+func siteCustomPath() string {
+	return filepath.Join(deployHome(), "site-custom.json")
+}
+
+func loadSiteCustoms() map[string]SiteCustom {
+	out := map[string]SiteCustom{}
+	data, err := os.ReadFile(siteCustomPath())
+	if err != nil {
+		return out
+	}
+	_ = json.Unmarshal(data, &out)
+	return out
+}
+
+func getSiteCustom(safe string) SiteCustom {
+	return loadSiteCustoms()[safe]
+}
+
+func saveSiteCustom(safe string, c SiteCustom) error {
+	all := loadSiteCustoms()
+	if len(c.Tools) == 0 && len(c.Env) == 0 && len(c.Volumes) == 0 {
+		delete(all, safe)
+	} else {
+		if c.Tools == nil {
+			c.Tools = []string{}
+		}
+		if c.Env == nil {
+			c.Env = map[string]string{}
+		}
+		if c.Volumes == nil {
+			c.Volumes = []string{}
+		}
+		all[safe] = c
+	}
+	data, err := json.MarshalIndent(all, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(siteCustomPath(), data, 0644)
+}
+
+// siteVolumes объединяет штатные тома site-volumes.conf и tomы из site-custom.json.
+func siteVolumes(safe string) []string {
+	return append(extraVolumesForSite(safe), getSiteCustom(safe).Volumes...)
+}
+
+// envBlock рендерит блок environment для compose (4 пробела) или "".
+// base дописывается к пользовательским переменным (например PORT).
+func envBlock(safe string, base map[string]string) string {
+	custom := getSiteCustom(safe).Env
+	if len(custom) == 0 && len(base) == 0 {
+		return ""
+	}
+	// стабильный порядок: base затем custom
+	seen := map[string]bool{}
+	var keys []string
+	for k := range base {
+		keys = append(keys, k)
+		seen[k] = true
+	}
+	var ck []string
+	for k := range custom {
+		if !seen[k] {
+			ck = append(ck, k)
+		}
+	}
+	// sort keys for determinism
+	sortStrings(keys)
+	sortStrings(ck)
+	var b strings.Builder
+	b.WriteString("    environment:\n")
+	for _, k := range keys {
+		b.WriteString("      - " + k + "=" + base[k] + "\n")
+	}
+	for _, k := range ck {
+		b.WriteString("      - " + k + "=" + custom[k] + "\n")
+	}
+	return b.String()
+}
+
+func sortStrings(a []string) {
+	for i := 1; i < len(a); i++ {
+		for j := i; j > 0 && a[j] < a[j-1]; j-- {
+			a[j], a[j-1] = a[j-1], a[j]
+		}
+	}
 }
 
 // siteVolumesBlock рендерит блок "volumes:" для docker-compose (с отступом 4 пробела),
@@ -630,6 +728,85 @@ func listServices() []string {
 	return out
 }
 
+// siteComposeInfo находит dir и host-port сервиса в compose (для apply кастомизации).
+func siteComposeInfo(safe string) (string, int, bool) {
+	c := readCompose()
+	lines := strings.Split(c, "\n")
+	inSvc := false
+	dir := ""
+	port := 0
+	for _, line := range lines {
+		ind := len(line) - len(strings.TrimLeft(line, " \t"))
+		trimmed := strings.TrimSpace(line)
+		if ind == 0 {
+			if strings.HasPrefix(trimmed, "services") {
+				inSvc = true
+			} else {
+				inSvc = false
+			}
+			continue
+		}
+		if !inSvc {
+			continue
+		}
+		if ind <= 2 {
+			key := strings.TrimSuffix(trimmed, ":")
+			if key == safe {
+				inSvc = true // stays in block until next top-level service
+				// mark by continuing; detect end when new service key
+			} else if strings.HasSuffix(trimmed, ":") && key != safe {
+				// new service — stop if we were in target
+				if dir != "" || port != 0 {
+					break
+				}
+				inSvc = false
+				continue
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "context:") {
+			dir = strings.TrimSpace(strings.TrimPrefix(trimmed, "context:"))
+		}
+		if m := regexp.MustCompile(`"(\d+):\d+(?::\d+)?"`).FindStringSubmatch(trimmed); m != nil && port == 0 {
+			// ports: ["0.0.0.0:8084:80"] or ["8084:80"]
+			parts := strings.Split(m[1], ":")
+			_ = parts
+			if p, err := strconv.Atoi(m[1]); err == nil && p > 0 {
+				// может быть 0.0.0.0 -> первая группа; уже только цифры из группы
+				port = p
+			}
+		}
+		// volumes mount as dir source for static
+		if dir == "" && strings.Contains(trimmed, ":/usr/share/nginx/html") {
+			src := strings.TrimPrefix(trimmed, "- ")
+			src = strings.TrimSuffix(src, ":/usr/share/nginx/html:ro")
+			src = strings.TrimSuffix(src, ":/usr/share/nginx/html")
+			if strings.HasPrefix(src, "/") {
+				dir = src
+			}
+		}
+		if dir == "" && strings.Contains(trimmed, ":/var/www/html") {
+			src := strings.TrimPrefix(trimmed, "- ")
+			src = strings.TrimSuffix(src, ":/var/www/html")
+			src = strings.TrimSuffix(src, ":/var/www/html:ro")
+			if strings.HasPrefix(src, "/") {
+				dir = src
+			}
+		}
+	}
+	// fallback: docker inspect mounts
+	if dir == "" {
+		out, err := exec.Command("docker", "inspect", "-f", "{{range .Mounts}}{{if eq .Destination \"/var/www/html\"}}{{.Source}}{{end}}{{if eq .Destination \"/usr/share/nginx/html\"}}{{.Source}}{{end}}{{end}}", safe).Output()
+		if err == nil {
+			dir = strings.TrimSpace(string(out))
+		}
+	}
+	if port == 0 {
+		port = containerHostPort(safe)
+	}
+	return dir, port, dir != ""
+}
+
 // runnerNames — реальные контейнеры раннеров (а не только из compose).
 func runnerNames() []string {
 	out := []string{}
@@ -667,13 +844,19 @@ func innerPort(lang LangInfo) int {
 // prepareBuild создаёт .deploy.Dockerfile в каталоге сайта из шаблона
 // (для языков, которые собираются в образ). Так docker build берёт контекст
 // из папки сайта (host-путь, видимый демону), а не из внутренностей контейнера.
-func prepareBuild(dir string, lang LangInfo) error {
+// safe — имя сервиса; tools из site-custom.json вшиваются как RUN apk add.
+func prepareBuild(dir string, lang LangInfo, safe string) error {
+	tools := getSiteCustom(safe).Tools
 	if lang.Name == "static" {
-		return nil
+		if len(tools) == 0 {
+			return nil
+		}
+		df := "FROM nginx:alpine\n" + toolsRunLine(tools) + "\n"
+		return os.WriteFile(filepath.Join(dir, ".deploy.Dockerfile"), []byte(df), 0644)
 	}
-	// Если репозиторий даёт собственный Dockerfile — используем его (кроме php,
-	// где legacy Dockerfile только с php-fpm ломает деплой).
-	if lang.Name != "php" {
+	// Свой Dockerfile репозитория используем, только если нет tools
+	// (кроме php — legacy Dockerfile с php-fpm ломает деплой).
+	if lang.Name != "php" && len(tools) == 0 {
 		if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
 			return nil
 		}
@@ -682,11 +865,35 @@ func prepareBuild(dir string, lang LangInfo) error {
 	if err != nil {
 		return fmt.Errorf("шаблон %s не найден: %v", lang.Template, err)
 	}
+	if len(tools) > 0 {
+		data = injectTools(data, tools)
+	}
 	di := filepath.Join(dir, ".dockerignore")
 	if _, err := os.Stat(di); err != nil {
 		os.WriteFile(di, []byte(".git\nnode_modules\n__pycache__\n.venv\ndist\nbuild\n*.db\n*.sqlite\n*.sqlite3\n*.db-wal\n*.db-shm\n*.zip\n"), 0644)
 	}
 	return os.WriteFile(filepath.Join(dir, ".deploy.Dockerfile"), data, 0644)
+}
+
+// toolsRunLine — RUN apk add для tools (шаблоны alpine-based).
+func toolsRunLine(tools []string) string {
+	return "RUN apk add --no-cache " + strings.Join(tools, " ")
+}
+
+// injectTools вставляет RUN с пакетами сразу после первой строки FROM.
+func injectTools(dockerfile []byte, tools []string) []byte {
+	line := toolsRunLine(tools)
+	lines := strings.Split(string(dockerfile), "\n")
+	for i, l := range lines {
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(l)), "FROM ") {
+			out := make([]string, 0, len(lines)+1)
+			out = append(out, lines[:i+1]...)
+			out = append(out, line)
+			out = append(out, lines[i+1:]...)
+			return []byte(strings.Join(out, "\n"))
+		}
+	}
+	return append(dockerfile, '\n')
 }
 
 // prepareStaticNginx кладёт nginx-конфиг в папку сайта (.deploy.nginx.conf),
@@ -717,29 +924,46 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
 		ownDockerfile = true
 	}
+	custom := getSiteCustom(safe)
+	extraVols := siteVolumes(safe)
 
 	switch lang.Name {
 	case "static":
-		vols := siteVolumesBlock([]string{
+		baseVols := []string{
 			dir + ":/usr/share/nginx/html:ro",
 			dir + "/.deploy.nginx.conf:/etc/nginx/conf.d/default.conf:ro",
-		}, extraVolumesForSite(safe))
+		}
+		volBlock := siteVolumesBlock(baseVols, extraVols)
+		// с tools — собираем свой образ nginx+пакеты; без — image: nginx:alpine
+		if len(custom.Tools) > 0 {
+			env := envBlock(safe, nil)
+			return fmt.Sprintf(`  %s:
+    build:
+      context: %s
+      dockerfile: .deploy.Dockerfile
+    container_name: %s
+    restart: unless-stopped
+    ports: ["%s:%d:80"]
+%s%s    labels:
+      - "deploy-stack.site=%s"
+`, safe, dir, safe, bind, port, env, volBlock, name)
+		}
 		return fmt.Sprintf(`  %s:
     image: nginx:alpine
     container_name: %s
     restart: unless-stopped
     ports: ["%s:%d:80"]
-%s    labels:
+%s%s    labels:
       - "deploy-stack.site=%s"
-`, safe, safe, bind, port, vols, name)
+`, safe, safe, bind, port, envBlock(safe, nil), volBlock, name)
 
 	case "php":
 		// Site-контекст: .deploy.Dockerfile (nginx + php-fpm) кладётся prepareBuild.
 		// Старый legacy Dockerfile репозитория (только php-fpm) игнорируется.
-		vols := siteVolumesBlock([]string{
+		volBlock := siteVolumesBlock([]string{
 			dir + ":/var/www/html",
 			dir + ":/var/www/" + name,
-		}, extraVolumesForSite(safe))
+		}, extraVols)
 		return fmt.Sprintf(`  %s:
     build:
       context: %s
@@ -747,17 +971,18 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     container_name: %s
     restart: unless-stopped
     ports: ["%s:%d:80"]
-%s    labels:
+%s%s    labels:
       - "deploy-stack.site=%s"
-`, safe, dir, safe, bind, port, vols, name)
+`, safe, dir, safe, bind, port, envBlock(safe, nil), volBlock, name)
 
 	default:
 		inner := innerPort(lang)
 		df := ".deploy.Dockerfile"
-		if ownDockerfile {
+		if ownDockerfile && len(custom.Tools) == 0 {
 			df = "Dockerfile"
 		}
-		vols := siteVolumesBlock(nil, extraVolumesForSite(safe))
+		volBlock := siteVolumesBlock(nil, extraVols)
+		env := envBlock(safe, map[string]string{"PORT": strconv.Itoa(inner)})
 		return fmt.Sprintf(`  %s:
     build:
       context: %s
@@ -765,11 +990,9 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
     container_name: %s
     restart: unless-stopped
     ports: ["%s:%d:%d"]
-    environment:
-      - PORT=%d
-%s    labels:
+%s%s    labels:
       - "deploy-stack.site=%s"
-`, safe, dir, df, safe, bind, port, inner, inner, vols, name)
+`, safe, dir, df, safe, bind, port, inner, env, volBlock, name)
 	}
 }
 
@@ -886,10 +1109,10 @@ func deploySite(name, dir string, port int, lang LangInfo) (int, error) {
 			return 0, fmt.Errorf("nginx-конфиг: %v", err)
 		}
 	}
-	if err := prepareBuild(dir, lang); err != nil {
+	safe := serviceName(name)
+	if err := prepareBuild(dir, lang, safe); err != nil {
 		return 0, err
 	}
-	safe := serviceName(name)
 	c := readCompose()
 	c = removeService(c, safe)
 	c = insertService(c, buildServiceBlock(name, dir, port, lang))

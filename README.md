@@ -19,7 +19,7 @@ jobs:
 
 ## Features
 
-### Web UI (v1.5.1)
+### Web UI (v1.5.2)
 
 | Tab | What you get |
 |-----|--------------|
@@ -176,6 +176,8 @@ All endpoints require `Authorization: Bearer <token>`.
 |--------|----------|-------------|
 | GET | `/api/v1/sites` | Managed sites (name/port/status/image) |
 | POST | `/api/v1/sites` | Deploy site |
+| GET | `/api/v1/sites/:name/custom` | Site customization (tools/env/volumes) |
+| POST | `/api/v1/sites/:name/custom` | Save customization; body `{"tools":[],"env":{},"volumes":[],"apply":true}` redeploys |
 | GET | `/api/v1/containers` | List containers (`?show_all=true`) |
 | GET | `/api/v1/containers/:name/logs` | Logs (`?tail=N`) |
 | POST | `/api/v1/containers/:name/exec` | **Streaming** exec — body `{"cmd":"..."}` |

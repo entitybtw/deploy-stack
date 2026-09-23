@@ -83,7 +83,7 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 .sv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .sv-dot.g{background:#6ba76b}.sv-dot.r{background:#c47a7a}
 .sv-dot.y{background:#c4b86b}
-#toasts{position:fixed;top:52px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:360px}
+#toasts{position:fixed;top:52px;right:16px;z-index:100000;display:flex;flex-direction:column;gap:8px;max-width:360px}
 .toast{background:var(--b1);border:1px solid var(--br2);border-left:3px solid var(--accent);padding:10px 14px;font-size:13px;color:var(--t0);box-shadow:0 4px 16px rgba(0,0,0,.35);animation:tin .15s ease}
 .toast.ok{border-left-color:#6ba76b}
 .toast.err{border-left-color:#c47a7a}
@@ -299,7 +299,7 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 
 <div class="lbg" id="mSrvDetail" onclick="if(event.target===this)hideModal('mSrvDetail')"><div class="lb">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span style="font-weight:600;font-size:15px" id="srvTitle">Server</span>
+    <div style="display:flex;flex-direction:column;min-width:0"><span style="font-weight:600;font-size:15px" id="srvTitle">Server</span><span class="cm" id="srvMeta"></span></div>
     <div style="display:flex;gap:4px"><button class="b" onclick="srvRefresh()">Refresh</button><button class="b" onclick="hideModal('mSrvDetail')">Close</button></div>
   </div>
   <div id="srvBody" style="flex:1;overflow:auto"></div>
@@ -320,8 +320,21 @@ var T=localStorage.getItem('ds-tk')||'';
 function $(id){return document.getElementById(id)}
 function e(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML}
 function esc(s){return encodeURIComponent(s)}
-function showModal(id){$(id).classList.add('on')}
-function hideModal(id){$(id).classList.remove('on')}
+function fmtJSON(v){
+  if(v==null)return'';
+  if(typeof v==='string'){try{v=JSON.parse(v)}catch(x){return v}}
+  try{return JSON.stringify(v,null,2)}catch(x){return String(v)}
+}
+var modalZ=100;
+function showModal(id){var el=$(id);if(!el)return;modalZ+=10;el.style.zIndex=modalZ;el.classList.add('on')}
+function hideModal(id){var el=$(id);if(!el)return;el.classList.remove('on');el.style.zIndex=''}
+document.addEventListener('keydown',function(ev){
+  if(ev.key!=='Escape')return;
+  var open=[].slice.call(document.querySelectorAll('.mbg.on,.lbg.on'));
+  if(!open.length)return;
+  open.sort(function(a,b){return (parseInt(a.style.zIndex)||0)-(parseInt(b.style.zIndex)||0)});
+  hideModal(open[open.length-1].id);
+});
 
 /* ── Toasts ── */
 function toast(msg,kind){
@@ -472,7 +485,7 @@ function loadSites(){
   }).catch(function(er){$('sites').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 
-function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')})}
+function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){$('ib').textContent=fmtJSON(t);showModal('mInspect')}).catch(function(er){$('ib').textContent='Error: '+er;showModal('mInspect')})}
 function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
 function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){toast(name+' removed','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
 function openEdit(n,name,portsStr){$('esName2').textContent=name;$('esC').value=n;var pg='';var m=String(portsStr).match(/(\d+)->/);if(!m)m=String(portsStr).match(/->(\d+)/);if(m)pg=m[1];$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
@@ -696,6 +709,7 @@ function renderClusterNodes(st){
       +(x.error?'<div class="cv" style="color:#c47a7a;font-size:11px;flex-basis:100%">'+e(x.error)+'</div>':'')
       +'<div class="ca">'
       +'<button class="b b-p" onclick="openSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\',\''+esc(x.host||'')+'\')">manage</button>'
+      +'<a class="b" style="text-decoration:none;display:inline-flex;align-items:center" target="_blank" rel="noopener" href="http://'+e(x.host)+':'+e(x.port||3000)+'" title="open this node panel">panel ↗</a>'
       +'<button class="b" onclick="pingOne(\''+esc(x.id)+'\')">ping</button>'
       +'<button class="b" onclick="editSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\',\''+esc(x.host)+'\','+(x.port||3000)+')">edit</button>'
       +'<button class="b b-r" onclick="rmSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">rm</button>'
@@ -830,11 +844,14 @@ function saveEditSrv(){
 var curSrvId='',curSrvName='',curSrvHost='',curSrvTab='containers';
 function openSrv(id,name,host){
   curSrvId=id;curSrvName=name;curSrvHost=host||'';
-  if(!curSrvHost){
-    var found=(clusterServers||[]).filter(function(x){return x.id===id})[0];
-    if(found)curSrvHost=found.host||'';
-  }
+  var meta=(clusterServers||[]).filter(function(x){return x.id===id})[0];
+  if(!curSrvHost&&meta)curSrvHost=meta.host||'';
   $('srvTitle').textContent=name;
+  var bits=[];
+  if(curSrvHost)bits.push(curSrvHost+(meta&&meta.port?':'+meta.port:''));
+  if(meta&&meta.version)bits.push('v'+meta.version);
+  bits.push(meta&&meta.online?'online':'offline');
+  var el=$('srvMeta');if(el)el.textContent=bits.join(' · ');
   showModal('mSrvDetail');
   srvTab('containers');
 }
@@ -868,6 +885,8 @@ function srvLoadSites(id){
         +'<div class="ca">'
         +openBtn
         +'<button class="b b-p" onclick="srvTerm(\''+si+'\',\''+n+'\',\''+e(name)+'\')">term</button>'
+        +'<button class="b" onclick="srvInspect(\''+si+'\',\''+n+'\',\''+e(name)+'\')">info</button>'
+        +'<button class="b" onclick="srvSiteLogs(\''+si+'\',\''+n+'\',\''+e(name)+'\')">logs</button>'
         +(up?'<button class="b b-y" onclick="srvAction(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvAction(\''+si+'\',\''+n+'\',\'stop\')">stop</button>'
              :'<button class="b b-g" onclick="srvAction(\''+si+'\',\''+n+'\',\'start\')">start</button>')
         +'<button class="b b-r" onclick="srvRemove(\''+si+'\',\''+n+'\',\''+e(name)+'\')">rm</button>'
@@ -950,7 +969,7 @@ function srvLoadSys(id){
 
 function srvExec(id,cn,name){srvTerm(id,cn,name)}
 function srvLogs(id,cn,name){srvTerm(id,cn,name)}
-function srvInspect(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')}).catch(function(er){$('ib').textContent='Error: '+er;$('mInspect').classList.add('on')})}
+function srvInspect(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/inspect').then(function(t){$('ib').textContent=fmtJSON(t);showModal('mInspect')}).catch(function(er){$('ib').textContent='Error: '+er;showModal('mInspect')})}
 function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600);if(clusterMode==='all')loadAllClusterSites()}).catch(function(er){toast(String(er),'err')})}
 function srvRemove(id,cn,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id+'/containers/'+cn+'/remove').then(function(){toast(name+' removed','ok');setTimeout(srvRefresh,600);if(clusterMode==='all')loadAllClusterSites()}).catch(function(er){toast(String(er),'err')})}
 function srvRunnerAct(id,rn,a){api('POST','/api/v1/servers/'+id+'/runners/'+rn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}

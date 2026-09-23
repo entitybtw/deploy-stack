@@ -802,6 +802,9 @@ func syncDir(src, dst string) error {
 			"--exclude=.env", "--exclude=*.env", "--exclude=.env.*",
 			"--exclude=data/", "--exclude=uploads/", "--exclude=.ssh/",
 			"--exclude=cache/", "--exclude=access_requests.json",
+			"--exclude=site_data.js", "--exclude=site_config.json",
+			"--exclude=privacy.html", "--exclude=terms.html",
+			"--exclude=goserver/",
 			src+"/", dst+"/")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("rsync: %v: %s", err, strings.TrimSpace(string(out)))
@@ -816,7 +819,10 @@ func copyTree(src, dst string) error {
 		base := filepath.Base(rel)
 		switch {
 		case base == ".env", base == ".git", base == ".deploy.Dockerfile",
-			base == "cache", base == "access_requests.json":
+			base == "cache", base == "access_requests.json",
+			base == "site_data.js", base == "site_config.json",
+			base == "privacy.html", base == "terms.html",
+			base == "goserver":
 			return true
 		case strings.HasSuffix(base, ".db") || strings.HasSuffix(base, ".sqlite") ||
 			strings.HasSuffix(base, ".sqlite3") || strings.HasSuffix(base, ".db-wal") ||

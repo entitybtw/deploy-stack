@@ -62,6 +62,20 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 .cp:hover{border-color:var(--t2)}.cp.a{border-color:var(--t0)}
 .exec-output{background:#111;color:#ccc;padding:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;max-height:300px;overflow:auto;white-space:pre-wrap;margin-top:8px;display:none;border:1px solid var(--br1)}
 .exec-output.on{display:block}
+/* Terminal modal */
+#mTerm .lb{max-width:1100px;width:100%}
+.term-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.term-hd .term-meta{display:flex;align-items:center;gap:6px;min-width:0}
+.term-hd .term-t{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#termOut{background:#0c0c0c;color:#c8c8c8;border:1px solid var(--br1);padding:10px;min-height:280px;max-height:60vh;flex:1}
+#termOut .prompt{color:#7a9db8}
+#termOut .cmd{color:#e6a23c}
+#termOut .err{color:#c47a7a}
+.term-in{display:flex;gap:6px;align-items:center;margin-top:10px;background:var(--b2);border:1px solid var(--br1);padding:6px 8px}
+.term-in .ps{color:var(--accent);font-family:ui-monospace,monospace;font-weight:600;user-select:none}
+.term-in input{flex:1;background:transparent;border:none;color:var(--t0);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;outline:none;min-width:0}
+.term-in input::placeholder{color:var(--t2)}
+.term-hint{font-size:11px;color:var(--t2);margin-top:6px}
 .srv-sec{margin-top:14px;padding-top:12px;border-top:1px solid var(--br1)}
 .srv-sec h3{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--t1)}
 .srv-item{background:var(--b2);border:1px solid var(--br1);padding:8px 10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -213,13 +227,6 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
   <div class="fa"><button class="b" onclick="hideModal('mRun')">Cancel</button><button class="b b-p" onclick="addRunner()">Create</button></div>
 </div></div>
 
-<div class="mbg" id="mExec" onclick="if(event.target===this)hideModal('mExec')"><div class="md">
-  <h2>Exec: <span id="execName"></span></h2>
-  <div class="fg"><label>Command</label><input id="execCmd" placeholder="ls -la" onkeydown="if(event.key==='Enter')runExec()"></div>
-  <div class="fa"><button class="b" onclick="hideModal('mExec')">Close</button><button class="b b-p" onclick="runExec()">Run</button></div>
-  <div class="exec-output" id="execOut"></div>
-</div></div>
-
 <div class="mbg" id="mEditRunner" onclick="if(event.target===this)hideModal('mEditRunner')"><div class="md">
   <h2>Edit Runner: <span id="erName"></span></h2>
   <input type="hidden" id="erN">
@@ -234,6 +241,27 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
   <div class="fg"><label>Bind IP</label><input id="esIP" placeholder="0.0.0.0"></div>
   <div class="fg"><label>Source Directory</label><input id="esPath" placeholder="/var/www/name"></div>
   <div class="fa"><button class="b" onclick="hideModal('mEditSite')">Cancel</button><button class="b b-p" onclick="saveEditSite()">Save & Recreate</button></div>
+</div></div>
+
+<div class="lbg" id="mTerm" onclick="if(event.target===this)hideModal('mTerm')"><div class="lb">
+  <div class="term-hd">
+    <div class="term-meta">
+      <span class="term-t" id="termTitle">Terminal</span>
+      <span class="tag tag-node" id="termNode">local</span>
+    </div>
+    <div style="display:flex;gap:4px">
+      <button class="b" onclick="termReload()">↻ logs</button>
+      <button class="b" onclick="termClear()">clear</button>
+      <button class="b" onclick="hideModal('mTerm')">Close</button>
+    </div>
+  </div>
+  <pre id="termOut"></pre>
+  <div class="term-in">
+    <span class="ps">$</span>
+    <input id="termCmd" placeholder="command… (Enter to run)" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();termRun()}">
+    <button class="b b-p" onclick="termRun()">Run</button>
+  </div>
+  <div class="term-hint">Logs load on open. Type a command to exec in this container (works for local and cluster nodes).</div>
 </div></div>
 
 <div class="lbg" id="mLog" onclick="if(event.target===this)hideModal('mLog')"><div class="lb">
@@ -379,8 +407,7 @@ function loadContainers(){
       if(pm)openBtn='<a class="a-link" href="http://'+location.hostname+':'+pm[1]+'" target="_blank" rel="noopener">open ↗</a>';
       var ctrls=
           openBtn
-        + K('exec',"doExec('"+n+"')",'')
-        + K('logs',"doLogs('"+n+"','"+esc(x.name)+"')",'')
+        + K('term',"doLogs('"+n+"','"+esc(x.name)+"')",' b-p')
         + K('info',"doInspect('"+n+"','"+esc(x.name)+"')",'')
         + (x.managed?K('edit',"openEdit('"+n+"','"+esc(x.name)+"','"+esc(x.ports||'')+"')",''):'')
         + (up?(K('restart',"doAction('"+n+"','restart')",' b-y')+K('stop',"doAction('"+n+"','stop')",' b-r'))
@@ -414,8 +441,7 @@ function loadSites(){
       var openBtn=port?'<a class="a-link" href="http://'+location.hostname+':'+port+'" target="_blank" rel="noopener">:'+port+' ↗</a>':'';
       function K(l,a,c){return'<button class="b'+c+'" onclick="'+a+'">'+l+'</button>';}
       var ctrls=openBtn
-        +K('logs',"doLogs('"+n+"','"+esc(name)+"')",'')
-        +K('exec',"doExec('"+n+"')",'')
+        +K('term',"doLogs('"+n+"','"+esc(name)+"')",' b-p')
         +(up?(K('restart',"doAction('"+n+"','restart')",' b-y')+K('stop',"doAction('"+n+"','stop')",' b-r'))
             :K('start',"doAction('"+n+"','start')",' b-g'))
         +K('rm',"doRemove('"+n+"','"+esc(name)+"')",' b-r');
@@ -428,14 +454,62 @@ function loadSites(){
   }).catch(function(er){$('sites').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 
-function doLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/containers/'+n+'/logs?tail=500').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
 function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')})}
 function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
 function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){toast(name+' removed','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
 function openEdit(n,name,portsStr){$('esName2').textContent=name;$('esC').value=n;var pg='';var m=String(portsStr).match(/(\d+)->/);if(!m)m=String(portsStr).match(/->(\d+)/);if(m)pg=m[1];$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
 function saveEditSite(){var n=$('esC').value,port=parseInt($('esPort').value)||0,hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');toast('Saved','ok');setTimeout(function(){loadContainers();loadSites()},1500)}).catch(function(er){toast(String(er),'err')})}
-function doExec(n){$('execName').textContent=unescape(decodeURIComponent(n));$('execCmd').value='';$('execOut').textContent='';$('execOut').classList.remove('on');showModal('mExec');setTimeout(function(){$('execCmd').focus()},100)}
-function runExec(){var n=esc($('execName').textContent),cmd=$('execCmd').value;if(!cmd)return;var out=$('execOut');out.classList.add('on');out.textContent='Running: '+cmd+'\n';fetch('/api/v1/containers/'+n+'/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({cmd:cmd})}).then(function(r){return r.text()}).then(function(t){out.textContent+=t}).catch(function(er){out.textContent+='Error: '+er})}
+
+/* ── Terminal (logs + exec) — local & cluster ── */
+var termCtx=null;
+function openTerm(opts){
+  termCtx=opts;
+  $('termTitle').textContent=opts.title||'Terminal';
+  $('termNode').textContent=opts.node||'local';
+  $('termOut').textContent='';
+  $('termCmd').value='';
+  showModal('mTerm');
+  termReload();
+  setTimeout(function(){$('termCmd').focus()},80);
+}
+function termScroll(){var o=$('termOut');o.scrollTop=o.scrollHeight}
+function termAppend(t){$('termOut').textContent+=t;termScroll()}
+function termClear(){$('termOut').textContent=''}
+function termReload(){
+  if(!termCtx)return;
+  $('termOut').textContent='… loading logs\n';
+  fetch(termCtx.logsUrl,{headers:{'Authorization':'Bearer '+T}}).then(function(r){
+    if(r.status===401){showLogin();throw new Error('401')}
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.text();
+  }).then(function(t){
+    $('termOut').textContent=t||'(no logs)';
+    termScroll();
+  }).catch(function(er){$('termOut').textContent='Error: '+er});
+}
+function termRun(){
+  if(!termCtx)return;
+  var cmd=$('termCmd').value;
+  if(!cmd||!cmd.trim())return;
+  cmd=cmd.trim();
+  $('termCmd').value='';
+  termAppend('\n$ '+cmd+'\n');
+  fetch(termCtx.execUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({cmd:cmd})}).then(function(r){
+    if(r.status===401){showLogin();throw new Error('401')}
+    if(r.body&&r.body.getReader){
+      var reader=r.body.getReader(),dec=new TextDecoder();
+      function pump(){return reader.read().then(function(p){
+        if(p.done){termAppend('');return}
+        termAppend(dec.decode(p.value,{stream:true}));
+        return pump();
+      })}
+      return pump();
+    }
+    return r.text().then(function(t){termAppend(t)});
+  }).catch(function(er){termAppend('Error: '+er+'\n')});
+}
+function doLogs(n,name){openTerm({title:name||n,node:'local',logsUrl:'/api/v1/containers/'+n+'/logs?tail=500',execUrl:'/api/v1/containers/'+n+'/exec'})}
+function doExec(n,name){openTerm({title:name||n,node:'local',logsUrl:'/api/v1/containers/'+n+'/logs?tail=500',execUrl:'/api/v1/containers/'+n+'/exec'})}
 
 /* ── Deploy site (local or remote node) ── */
 function fillNodeSelect(){
@@ -564,7 +638,7 @@ function renderClusterNodes(st){
       +'</div>'
       +(x.error?'<div class="cv" style="color:#c47a7a;font-size:11px;flex-basis:100%">'+e(x.error)+'</div>':'')
       +'<div class="ca">'
-      +'<button class="b b-p" onclick="openSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">manage</button>'
+      +'<button class="b b-p" onclick="openSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\',\''+esc(x.host||'')+'\')">manage</button>'
       +'<button class="b" onclick="pingOne(\''+esc(x.id)+'\')">ping</button>'
       +'<button class="b" onclick="editSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\',\''+esc(x.host)+'\','+(x.port||3000)+')">edit</button>'
       +'<button class="b b-r" onclick="rmSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">rm</button>'
@@ -586,14 +660,14 @@ function loadAllClusterSites(){
         (sites||[]).forEach(function(x){
           var name=typeof x==='string'?x:x.name;
           rows.push({
-            node:s.name, nodeId:s.id, online:s.online!==false,
+            node:s.name, nodeId:s.id, nodeHost:s.host||'', online:s.online!==false,
             name:name,
             status:typeof x==='string'?'':(x.status||''),
             port:typeof x==='string'?0:(x.port||0)
           });
         });
       }).catch(function(){
-        rows.push({node:s.name,nodeId:s.id,online:false,name:'(offline)',status:'',port:0,err:true});
+        rows.push({node:s.name,nodeId:s.id,nodeHost:s.host||'',online:false,name:'(offline)',status:'',port:0,err:true});
       }).then(function(){
         pending--;
         if(pending===0)renderAllSites(rows);
@@ -603,7 +677,6 @@ function loadAllClusterSites(){
 }
 
 function renderAllSites(rows){
-  var q='';
   var box=$('allSites');
   if(!rows.length){box.innerHTML='';$('ase').style.display='block';return}
   $('ase').style.display='none';
@@ -611,16 +684,36 @@ function renderAllSites(rows){
   box.innerHTML='<div class="sh"><span class="sh-t">All sites ('+rows.length+')</span><input class="search" id="qA" placeholder="Search…" oninput="filterAllSites()"></div><div id="allSitesList">'
     +rows.map(function(x,i){
       var up=isUp(x.status);
-      var openBtn=x.port&&x.online?'<a class="a-link" href="http://'+location.hostname+':'+x.port+'" target="_blank" rel="noopener">:'+x.port+' ↗</a>':'';
+      var openHost=x.nodeHost||location.hostname;
+      var openBtn=x.port&&x.online?'<a class="a-link" href="http://'+openHost+':'+x.port+'" target="_blank" rel="noopener">:'+x.port+' ↗</a>':'';
+      var online=x.online&&!x.err;
+      var si=esc(x.nodeId),n=esc(x.name);
       return'<div class="c all-row" data-q="'+e((x.node+' '+x.name).toLowerCase())+'" style="border-left:3px solid '+(up?'rgba(119,153,64,.5)':(x.online?'rgba(221,215,119,.35)':'rgba(221,119,119,.4)'))+'">'
         +'<div class="cn">'+e(x.name)+'</div>'
         +'<span class="tag tag-node">'+e(x.node)+'</span>'
         +statusBadge(x.err?'offline':(x.status||'?'))
         +'<div class="ca">'
         +openBtn
-        +(x.online&&!x.err?'<button class="b" onclick="openSrv(\''+esc(x.nodeId)+'\',\''+esc(x.node)+'\')">manage</button>':'')
+        +(online?'<button class="b b-p" onclick="srvTerm(\''+si+'\',\''+n+'\',\''+e(x.name)+'\')">term</button>':'')
+        +(online?(up?'<button class="b b-y" onclick="allSitesAct(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="allSitesAct(\''+si+'\',\''+n+'\',\'stop\')">stop</button>'
+              :'<button class="b b-g" onclick="allSitesAct(\''+si+'\',\''+n+'\',\'start\')">start</button>'):'')
+        +(online?'<button class="b b-r" onclick="allSitesRm(\''+si+'\',\''+n+'\',\''+e(x.name)+'\')">rm</button>':'')
+        +(online?'<button class="b" onclick="openSrv(\''+esc(x.nodeId)+'\',\''+esc(x.node)+'\',\''+esc(x.nodeHost)+'\')">manage</button>':'')
         +'</div></div>';
     }).join('')+'</div>';
+}
+function allSitesAct(id,cn,a){
+  api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){
+    toast(a+' ok','ok');
+    setTimeout(loadAllClusterSites,800);
+  }).catch(function(er){toast(String(er),'err')});
+}
+function allSitesRm(id,cn,name){
+  if(!confirm('Remove '+name+'?'))return;
+  api('DELETE','/api/v1/servers/'+id+'/containers/'+cn+'/remove').then(function(){
+    toast(name+' removed','ok');
+    setTimeout(loadAllClusterSites,800);
+  }).catch(function(er){toast(String(er),'err')});
 }
 
 function filterAllSites(){
@@ -677,8 +770,17 @@ function saveEditSrv(){
   }).catch(function(er){toast(String(er),'err')});
 }
 
-var curSrvId='',curSrvName='',curSrvTab='containers';
-function openSrv(id,name){curSrvId=id;curSrvName=name;$('srvTitle').textContent=name;showModal('mSrvDetail');srvTab('containers')}
+var curSrvId='',curSrvName='',curSrvHost='',curSrvTab='containers';
+function openSrv(id,name,host){
+  curSrvId=id;curSrvName=name;curSrvHost=host||'';
+  if(!curSrvHost){
+    var found=(clusterServers||[]).filter(function(x){return x.id===id})[0];
+    if(found)curSrvHost=found.host||'';
+  }
+  $('srvTitle').textContent=name;
+  showModal('mSrvDetail');
+  srvTab('containers');
+}
 function srvTab(t){curSrvTab=t;srvRefresh()}
 function srvNavHTML(){
   var h='<div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap">';
@@ -702,13 +804,13 @@ function srvLoadSites(id){
       var status=typeof x==='string'?'':(x.status||'');
       var port=typeof x==='string'?0:(x.port||0);
       var up=isUp(status);var n=esc(name);var si=esc(id);
-      var openBtn=port?'<a class="a-link" href="http://'+location.hostname+':'+port+'" target="_blank" rel="noopener">:'+port+' ↗</a>':'';
+      var openBtn=port?'<a class="a-link" href="http://'+(curSrvHost||location.hostname)+':'+port+'" target="_blank" rel="noopener">:'+port+' ↗</a>':'';
       h+='<div class="srv-item" style="border-left:3px solid '+(up?'rgba(119,153,64,.4)':'rgba(221,119,119,.3)')+'">'
         +'<div class="cn">'+e(name)+'</div>'
         +statusBadge(status||'?')
         +'<div class="ca">'
         +openBtn
-        +'<button class="b" onclick="srvSiteLogs(\''+si+'\',\''+n+'\',\''+e(name)+'\')">logs</button>'
+        +'<button class="b b-p" onclick="srvTerm(\''+si+'\',\''+n+'\',\''+e(name)+'\')">term</button>'
         +(up?'<button class="b b-y" onclick="srvAction(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvAction(\''+si+'\',\''+n+'\',\'stop\')">stop</button>'
              :'<button class="b b-g" onclick="srvAction(\''+si+'\',\''+n+'\',\'start\')">start</button>')
         +'<button class="b b-r" onclick="srvRemove(\''+si+'\',\''+n+'\',\''+e(name)+'\')">rm</button>'
@@ -718,10 +820,17 @@ function srvLoadSites(id){
   }).catch(function(er){$('srvBody').innerHTML=srvNavHTML()+'<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 
+function srvTerm(id,cn,name,logsOverride,execOverride){
+  var base='/api/v1/servers/'+id+'/containers/'+cn;
+  openTerm({
+    title:name||cn,
+    node:(curSrvName||id),
+    logsUrl:logsOverride||('/api/v1/servers/'+id+'/containers/'+cn+'/logs?tail=500'),
+    execUrl:execOverride||(base+'/exec')
+  });
+}
 function srvSiteLogs(id,cn,name){
-  api('GET','/api/v1/servers/'+id+'/sites/'+cn+'/logs?tail=300').then(function(t){
-    $('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on');
-  }).catch(function(er){$('lb').textContent='Error: '+er;$('mLog').classList.add('on')});
+  openTerm({title:name||cn,node:(curSrvName||id),logsUrl:'/api/v1/servers/'+id+'/sites/'+cn+'/logs?tail=500',execUrl:'/api/v1/servers/'+id+'/containers/'+cn+'/exec'});
 }
 
 function srvLoadC(id){
@@ -736,8 +845,7 @@ function srvLoadC(id){
         +(c.ports?'<div class="cv">'+e(c.ports)+'</div>':'')
         +statusBadge(c.status||'?')
         +'<div class="ca">'
-        +'<button class="b" onclick="srvExec(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">exec</button>'
-        +'<button class="b" onclick="srvLogs(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">logs</button>'
+        +'<button class="b b-p" onclick="srvTerm(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">term</button>'
         +'<button class="b" onclick="srvInspect(\''+si+'\',\''+n+'\',\''+e(c.name)+'\')">info</button>'
         +(up?'<button class="b b-y" onclick="srvAction(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvAction(\''+si+'\',\''+n+'\',\'stop\')">stop</button>'
              :'<button class="b b-g" onclick="srvAction(\''+si+'\',\''+n+'\',\'start\')">start</button>')
@@ -761,7 +869,7 @@ function srvLoadR(id){
         +'<div class="cm">'+e(x.image||'')+'</div>'
         +statusBadge(x.status||'?')
         +'<div class="ca">'
-        +'<button class="b" onclick="srvRunnerLogs(\''+si+'\',\''+n+'\',\''+e(x.name)+'\')">logs</button>'
+        +'<button class="b b-p" onclick="srvRunnerTerm(\''+si+'\',\''+n+'\',\''+e(x.name)+'\')">term</button>'
         +(up?'<button class="b b-y" onclick="srvRunnerAct(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvRunnerAct(\''+si+'\',\''+n+'\',\'stop\')">stop</button>'
              :'<button class="b b-g" onclick="srvRunnerAct(\''+si+'\',\''+n+'\',\'start\')">start</button>')
         +'</div></div>';
@@ -783,13 +891,16 @@ function srvLoadSys(id){
   }).catch(function(er){$('srvBody').innerHTML=srvNavHTML()+'<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 
-function srvExec(id,cn,name){var cmd=prompt('Command for '+name+':');if(!cmd)return;api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/exec',{cmd:cmd}).then(function(r){$('lb').textContent=typeof r==='string'?r:JSON.stringify(r,null,2);$('logTitle').textContent='Result: '+name;$('mLog').classList.add('on')}).catch(function(er){toast('Error: '+er,'err')})}
-function srvLogs(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/logs?tail=300').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
+function srvExec(id,cn,name){srvTerm(id,cn,name)}
+function srvLogs(id,cn,name){srvTerm(id,cn,name)}
 function srvInspect(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')}).catch(function(er){$('ib').textContent='Error: '+er;$('mInspect').classList.add('on')})}
-function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}
-function srvRemove(id,cn,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id+'/containers/'+cn+'/remove').then(function(){toast(name+' removed','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}
+function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600);if(clusterMode==='all')loadAllClusterSites()}).catch(function(er){toast(String(er),'err')})}
+function srvRemove(id,cn,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id+'/containers/'+cn+'/remove').then(function(){toast(name+' removed','ok');setTimeout(srvRefresh,600);if(clusterMode==='all')loadAllClusterSites()}).catch(function(er){toast(String(er),'err')})}
 function srvRunnerAct(id,rn,a){api('POST','/api/v1/servers/'+id+'/runners/'+rn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}
-function srvRunnerLogs(id,rn,name){api('GET','/api/v1/servers/'+id+'/runners/'+rn+'/logs?tail=300').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
+function srvRunnerLogs(id,rn,name){srvRunnerTerm(id,rn,name)}
+function srvRunnerTerm(id,rn,name){
+  openTerm({title:name||rn,node:(curSrvName||id),logsUrl:'/api/v1/servers/'+id+'/runners/'+rn+'/logs?tail=500',execUrl:'/api/v1/servers/'+id+'/containers/'+rn+'/exec'});
+}
 
 /* ── Runners ── */
 function loadRunners(){
@@ -808,7 +919,7 @@ function loadRunners(){
         +'<div class="cm">'+e(x.image||'')+'</div>'
         +statusBadge(x.status||'?')
         +'<div class="ca">'
-        +'<button class="b" onclick="doRunnerLogs(\''+n+'\',\''+e(x.name)+'\')">logs</button>'
+        +'<button class="b b-p" onclick="doRunnerTerm(\''+n+'\',\''+e(x.name)+'\')">term</button>'
         +'<button class="b" onclick="editRunner(\''+n+'\',\''+e(x.name)+'\',\''+lbl+'\')">edit</button>'
         +(up?'<button class="b b-y" onclick="doRunnerAction(\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="doRunnerAction(\''+n+'\',\'stop\')">stop</button>'
              :'<button class="b b-g" onclick="doRunnerAction(\''+n+'\',\'start\')">start</button>')
@@ -820,7 +931,8 @@ function loadRunners(){
 function addRunner(){var n=$('rN').value,u=$('rU').value,t=$('rT').value;if(!n||!u||!t){toast('Fill all fields','err');return}api('POST','/api/v1/runners/add',{name:n,url:u,token:t,labels:$('rL').value,capacity:parseInt($('rCap').value)||1,platform:$('rPlat').value}).then(function(){hideModal('mRun');toast('Runner created','ok');setTimeout(loadRunners,2000)}).catch(function(er){toast('Error: '+er,'err')})}
 function doRunnerRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){toast(name+' removed','ok');setTimeout(loadRunners,1000)}).catch(function(er){toast(String(er),'err')})}
 function doRunnerAction(n,a){api('POST','/api/v1/runners/'+n+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(loadRunners,2000)}).catch(function(er){toast(String(er),'err')})}
-function doRunnerLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/runners/'+n+'/logs').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
+function doRunnerTerm(n,name){openTerm({title:name||n,node:'local',logsUrl:'/api/v1/runners/'+n+'/logs?tail=500',execUrl:'/api/v1/containers/'+n+'/exec'})}
+function doRunnerLogs(n,name){doRunnerTerm(n,name)}
 function editRunner(n,name,labels){$('erName').textContent=name;$('erN').value=n;$('erL').value=labels;showModal('mEditRunner')}
 function saveRunnerEdit(){var n=$('erN').value,labels=$('erL').value;api('POST','/api/v1/runners/'+esc(n)+'/edit',{labels:labels}).then(function(){hideModal('mEditRunner');toast('Runner updated','ok');setTimeout(loadRunners,2000)}).catch(function(er){toast('Error: '+er,'err')})}
 

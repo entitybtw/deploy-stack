@@ -19,7 +19,7 @@ jobs:
 
 ## Features
 
-### Web UI (v1.5.2)
+### Web UI (v1.5.3)
 
 | Tab | What you get |
 |-----|--------------|

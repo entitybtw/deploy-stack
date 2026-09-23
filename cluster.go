@@ -478,7 +478,7 @@ func (cl *Cluster) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"nodes":   out,
 		"total":   len(out),
 		"online":  online,
-		"version": "1.5.2",
+		"version": "1.5.3",
 	})
 }
 

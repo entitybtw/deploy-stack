@@ -202,6 +202,96 @@ func (cs *ClusterStore) LoginServer(id string) error {
 	return nil
 }
 
+// CallServerStream — как CallServer, но отдаёт ответ в w со стримингом (flush).
+// Нужно для exec/логов, чтобы вывод шёл в реальном времени.
+func (cs *ClusterStore) CallServerStream(id, method, path string, body interface{}, w http.ResponseWriter) error {
+	s := cs.GetServer(id)
+	if s == nil {
+		return fmt.Errorf("server not found")
+	}
+	if s.Token == "" {
+		if err := cs.LoginServer(id); err != nil {
+			return err
+		}
+		s = cs.GetServer(id)
+		if s == nil {
+			return fmt.Errorf("server not found")
+		}
+	}
+
+	call := func(token string) (*http.Response, error) {
+		url := fmt.Sprintf("http://%s:%d%s", s.Host, s.Port, path)
+		var bodyReader io.Reader
+		if body != nil {
+			data, _ := json.Marshal(body)
+			bodyReader = strings.NewReader(string(data))
+		}
+		req, err := http.NewRequest(method, url, bodyReader)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		// без таймаута — exec может работать долго
+		client := &http.Client{}
+		return client.Do(req)
+	}
+
+	resp, err := call(s.Token)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == 401 {
+		resp.Body.Close()
+		if err := cs.LoginServer(id); err != nil {
+			return err
+		}
+		s = cs.GetServer(id)
+		if s == nil {
+			return fmt.Errorf("server not found")
+		}
+		resp, err = call(s.Token)
+		if err != nil {
+			return err
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		data, _ := io.ReadAll(resp.Body)
+		var e struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(data, &e) == nil && e.Error != "" {
+			return fmt.Errorf("%s", e.Error)
+		}
+		return fmt.Errorf("remote HTTP %d", resp.StatusCode)
+	}
+
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	} else {
+		w.Header().Set("Content-Type", "text/plain")
+	}
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, _ := w.(http.Flusher)
+
+	buf := make([]byte, 4096)
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			w.Write(buf[:n])
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	return nil
+}
+
 func (cs *ClusterStore) CallServer(id, method, path string, body interface{}) ([]byte, error) {
 	s := cs.GetServer(id)
 	if s == nil {
@@ -388,7 +478,7 @@ func (cl *Cluster) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"nodes":   out,
 		"total":   len(out),
 		"online":  online,
-		"version": "1.5.0",
+		"version": "1.5.1",
 	})
 }
 
@@ -521,13 +611,9 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 			if tail == "" {
 				tail = "300"
 			}
-			data, err := cl.store.CallServer(id, "GET", "/api/v1/containers/"+sname+"/logs?tail="+tail, nil)
-			if err != nil {
-				jsonErr(w, err.Error(), 502)
-				return
+			if err := cl.store.CallServerStream(id, "GET", "/api/v1/containers/"+sname+"/logs?tail="+tail, nil, w); err != nil {
+				w.Write([]byte("Error: " + err.Error()))
 			}
-			w.Header().Set("Content-Type", "text/plain")
-			w.Write(data)
 			return
 		}
 
@@ -549,17 +635,21 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			// exec/logs — стримим в реальном времени
+			if strings.HasSuffix(rest, "/logs") || strings.HasSuffix(rest, "/exec") {
+				if err := cl.store.CallServerStream(id, r.Method, path, body, w); err != nil {
+					// заголовки могли уже уйти — дописываем текст ошибки
+					w.Write([]byte("Error: " + err.Error()))
+				}
+				return
+			}
+
 			data, err := cl.store.CallServer(id, r.Method, path, body)
 			if err != nil {
 				jsonErr(w, err.Error(), 502)
 				return
 			}
-			// логи/inspects — text, остальное json
-			if strings.HasSuffix(rest, "/logs") || strings.HasSuffix(rest, "/exec") {
-				w.Header().Set("Content-Type", "text/plain")
-			} else {
-				w.Header().Set("Content-Type", "application/json")
-			}
+			w.Header().Set("Content-Type", "application/json")
 			w.Write(data)
 			return
 		}
@@ -580,19 +670,25 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 					body = b
 				}
 			}
+			// логи раннера — стримим
+			if strings.HasSuffix(rest, "/logs") {
+				if err := cl.store.CallServerStream(id, r.Method, path, body, w); err != nil {
+					w.Write([]byte("Error: " + err.Error()))
+				}
+				return
+			}
+
 			data, err := cl.store.CallServer(id, r.Method, path, body)
 			if err != nil {
 				jsonErr(w, err.Error(), 502)
 				return
 			}
-			if strings.HasSuffix(rest, "/logs") {
-				w.Header().Set("Content-Type", "text/plain")
-			} else {
-				w.Header().Set("Content-Type", "application/json")
-			}
+			w.Header().Set("Content-Type", "application/json")
 			w.Write(data)
 			return
 		}
+
+		// POST /servers/:id/containers/:cname/exec — уже покрыто CallServerStream выше
 	}
 
 	if r.Method == "DELETE" {

@@ -467,7 +467,7 @@ func startWebServer(port int) {
 			"containers": len(listContainers(false)),
 			"sites":      listServices(),
 			"runners":    runnerNames(),
-			"version":    "1.5.0",
+			"version":    "1.5.1",
 		})
 	}))
 
@@ -527,7 +527,7 @@ func startWebServer(port int) {
 	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	log.Printf("deploy-stack v1.5.0 on :%d", port)
+	log.Printf("deploy-stack v1.5.1 on :%d", port)
 	log.Printf("Web:  http://localhost:%d", port)
 	log.Printf("API:  http://localhost:%d/api/v1/", port)
 	log.Fatal(http.ListenAndServe(addr, mux))

@@ -1,8 +1,8 @@
 # deploy-stack
 
-Universal Docker deployment platform with web UI, API, cluster management, and Forgejo CI/CD runners.
+Universal Docker deployment platform with web UI, API, multi-node cluster management, and Forgejo CI/CD runners.
 
-**Zero-config деплой:** в репозитории достаточно указать label раннера (`runs-on`) и порт —
+**Zero-config deploy:** в репозитории достаточно указать label раннера (`runs-on`) и порт —
 `deploy-stack` сам определит язык, соберёт контейнер и поднимет сайт.
 
 ```yaml
@@ -10,7 +10,7 @@ name: Deploy
 on: { push: { branches: [main] } }
 jobs:
   deploy:
-    runs-on: web        # label раннера (node-web)
+    runs-on: web        # label раннера
     env: { PORT: 8084 }      # внешний порт сайта
     steps:
       - uses: actions/checkout@v4
@@ -19,124 +19,120 @@ jobs:
 
 ## Features
 
+### Web UI (v1.5.1)
+
+| Tab | What you get |
+|-----|--------------|
+| **Sites** | All compose sites: port, status, open ↗, **term**, restart/stop/rm, search, auto-refresh |
+| **Containers** | All Docker containers: image, ports, **term**, inspect, start/stop/restart/rm |
+| **Cluster** | **Nodes** — cards with sites/containers/runners counts, online/offline, manage/ping/edit/rm. **All sites** — every site from every node in one list with **full control** (open↗ by node host, term, stop/restart/start, rm, manage) |
+| **Runners** | Forgejo/Gitea/GitHub runners: labels, **term**, edit, restart/stop/rm |
+| **Settings** | Accent color, themes (dark/light/black), show/hide all containers |
+
+**Terminal (everywhere):** кнопка `term` открывает модалку с логами + строкой ввода команд.
+Работает и на main-ноде, и на любой ноде кластера (exec стримится в реальном времени).
+Есть `↻ logs` и `clear`.
+
+**Deploy to node:** в форме деплоя можно выбрать целевую ноду кластера.
+
+**Toasts** вместо alert; счётчики Sites/Nodes в top-bar.
+
+### Engine
+
 - **Zero-config deploy** — `deploy` в CI: имя из репозитория, язык авто, порт из `PORT`/`.deploy`
-- **Sites tab** — все compose-сайты: порт, статус, open ↗, logs/exec/restart/stop/rm, поиск, auto-refresh
-- **Containers** — list, exec, logs, inspect, start/stop/restart/remove, поиск
-- **Cluster** — карточки нод со счётчиками sites/containers/runners, online/offline,
-  **All sites** (все сайты кластера в одном списке), **Deploy to node** из формы деплоя,
-  edit учёток, ping одной ноды, manage (Containers / Sites / Runners / System)
-- **Runners** — Forgejo/Gitea/GitHub runner management with labels, logs, edit
-- **Settings** — accent color, themes (dark/light/black), show/hide all containers
-- **Toasts** — уведомления вместо alert
 - **Auto-detection** — PHP, Python, Node.js, Go, Rust, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, Bun, Deno
 - **CLI** — `deploy` (auto) / `add` / `rm` / `list` / `logs` / `restart` / `serve` / `add-runner`
 - **Webhook** — auto-deploy on push via Forgejo/Gitea webhooks
-
+- **Cluster API** — aggregate status, remote exec/logs (streaming), remote deploy, node CRUD
 
 ## Architecture
 
 ```
 Host
-├── node-ci: Forgejo (git.example.com:3006) + services
-├── node-4: deploy-stack (port 9090) + example.com (port 8088)
-│   └── Runner: my-site:host
-├── node-web: deploy-stack (port 9090) + N sites
-│   └── Runner: webserver:host
-└── node-app: deploy-stack (port 9090) + N sites
-    └── Runner: worker:host
+├── Forgejo (git.example.com) + Actions
+├── node-web      :9090  + N sites  + runner label: web
+├── node-app      :9090  + N sites  + runner label: app
+└── node-ci   :9090  + N sites     + runner label: ci
+         ↑
+    All nodes join one Cluster (manage from any panel)
 ```
+
+Each node runs the same panel (Docker or host binary). Any panel can act as
+the "main" UI and remotely manage the others.
 
 ## Quick Start
 
-### 1. Install Go and build
+### 1. Build
 
 ```bash
-# On your build machine
 git clone https://git.example.com/example/deploy-stack.git
 cd deploy-stack
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy .
 ```
 
-### 2. Deploy to server (Docker/host)
+Or with Docker (no local Go needed):
 
 ```bash
-# Copy binary and static files
+docker run --rm -v "$PWD":/src -w /src -e CGO_ENABLED=0 -e GOOS=linux -e GOARCH=amd64 \
+  golang:1.23-alpine sh -c "go vet ./... && go build -ldflags='-s -w' -o /src/deploy ."
+```
+
+### 2. Install on a server
+
+```bash
 scp deploy root@SERVER:/root/deploy-stack/deploy
 scp -r static/ root@SERVER:/root/deploy-stack/static/
-
-# Create data dir
 mkdir -p /root/deploy-stack/data
-
-# Start
 /root/deploy-stack/deploy serve --port 9090
 ```
 
-### 3. Or use docker-compose
-
-```bash
-# On the target server
-cd /root/deploy-stack
-docker compose up -d
-```
-
-### Контейнерная поставка (одна команда для любого Docker-хоста)
-
-В репозитории лежит готовый `docker-compose.yml` который поднимает панель-менеджер
-и Forgejo runner одним стеком (панель работает через `docker.sock`, обязателен Linux-хост):
+### 3. Or docker-compose
 
 ```bash
 git clone https://git.example.com/example/deploy-stack.git
 cd deploy-stack
-./install.sh              # сгенерирует .env со случайным паролем и запустит стек
-# или вручную:
-cp .env.example .env      # задай DEPLOY_ADMIN_PASS
+./install.sh              # .env with random password + up
+# or
+cp .env.example .env      # set DEPLOY_ADMIN_PASS
 docker compose up -d --build
-# панель на :3000, раннер подключается при непустом DEPLOY_RUNNER_REGTOKEN
+# panel on :3000
 ```
 
-> **IPv6:** если у хоста сломан IPv6, `docker build` может «висеть» на `apk update`.
-> Собирай через `docker build --network=host -t deploy-stack:latest .`
-> или добавь в `/etc/docker/daemon.json`:
-> ```json
-> { "dns": ["1.1.1.1", "8.8.8.8"], "ipv6": false }
-> ```
-
-Панель можно запускать и как системный сервис на хосте (без контейнера) — тогда она
-управляет локальным демоном напрямую; оба способа дают один и тот же API/UI.
-
+> **IPv6:** if host IPv6 is broken, `docker build` may hang on `apk update`.
+> Use `docker build --network=host -t deploy-stack:latest .` or set in
+> `/etc/docker/daemon.json`: `{ "dns": ["1.1.1.1","8.8.8.8"], "ipv6": false }`
 
 ### 4. First login
 
-Open `http://SERVER:9090` in browser.  
-Default credentials: `admin` / `admin`
+Open `http://SERVER:PORT` → default `admin` / `admin`.
 
-Change password via environment:
+Change password:
 
 ```bash
 DEPLOY_ADMIN_PASS=your-password /root/deploy-stack/deploy serve --port 9090
 ```
 
-## CLI Usage
+## CLI
 
 ```bash
-deploy                                  # Авто-деплой текущего репо (CI) / интерактивно
-deploy --port 8084 [--name N --type T]  # Авто-деплой с явными параметрами
-deploy add <name> <dir> [--port N]      # Добавить сайт (авто-определение языка)
-deploy rm <name>                        # Удалить сайт
-deploy list                             # Список сайтов: порт + статус
-deploy logs <name> [--tail N]           # Логи сайта
-deploy restart <name>                   # Перезапустить сайт
-deploy runners                          # Список раннеров
-deploy add-runner <name> <token>        # Добавить Forgejo runner
-deploy rm-runner [name]                 # Удалить раннер(ы)
-deploy status                           # Контейнеры сайтов
-deploy up / down                        # Поднять/остановить всё
-deploy serve --port 3000                # Панель-менеджер (web UI + API)
+deploy                                  # auto-deploy current repo (CI)
+deploy --port 8084 [--name N --type T]  # auto-deploy with flags
+deploy add <name> <dir> [--port N]      # add site (auto language)
+deploy rm <name>                        # remove site
+deploy list                             # sites: port + status
+deploy logs <name> [--tail N]           # site logs
+deploy restart <name>                   # restart site
+deploy runners                          # list runners
+deploy add-runner <name> <token>        # add Forgejo runner
+deploy rm-runner [name]                 # remove runner(s)
+deploy status                           # site containers
+deploy up / down                        # start/stop all
+deploy serve --port 3000                # panel (web UI + API)
 ```
 
-### Файл `.deploy` (опционально)
+### `.deploy` file (optional)
 
-Положите в корень репозитория — тогда в workflow достаточно `runs-on`:
+Put in repo root — then workflow only needs `runs-on`:
 
 ```
 NAME=my-site
@@ -144,95 +140,110 @@ PORT=8084
 TYPE=static      # static | php | python | node | go
 ```
 
-### Доп. тома для конкретного сайта (ключи/секреты)
+### Per-site extra volumes (secrets/keys)
 
-Чтобы не раздавать секреты всем сайтам, дополнительные bind-тома задаются
-точечно в файле `site-volumes.conf` рядом с бинарём (`DEPLOY_HOME`) или в
-переменной `DEPLOY_SITE_VOLUMES`. Формат строки:
+`site-volumes.conf` next to the binary (or `DEPLOY_SITE_VOLUMES`):
 
 ```
-<имя-сервиса>=<host-path>:<container-path>[:ro][,<host-path>:<container-path>...]
+<service>=<host-path>:<container-path>[:ro][,...]
 ```
 
-Пример — приватный SSH-ключ только для одного сайта:
+Example:
 
 ```
 panel=/etc/ssh/reverse.key:/etc/deploy-secrets/reverse.key:ro
 ```
 
-PHP-контейнер при старте копирует `/etc/deploy-secrets/*` в `/etc/ssh/`
-с правами `www-data:www-data 0600`, поэтому `ssh`/`rsync` из PHP работают
-и не ругаются на «too open permissions».
-Файл `site-volumes.conf` в git не попадает (см. `.gitignore`).
-
+PHP container copies `/etc/deploy-secrets/*` → `/etc/ssh/` as `www-data:www-data 0600`
+at start, so `ssh`/`rsync` from PHP work. File is gitignored.
 
 ## API
 
-All endpoints require `Authorization: Bearer <token>` header.
+All endpoints require `Authorization: Bearer <token>`.
+
+### Auth & status
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/login` | Get auth token |
+| POST | `/api/v1/login` | Get token |
 | POST | `/api/v1/logout` | Invalidate token |
-| GET | `/api/v1/status` | Server status |
+| GET | `/api/v1/status` | Server status (containers/sites/runners/version) |
+| GET | `/health` | Liveness (no auth) |
+
+### Sites & containers
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/v1/sites` | Managed sites (name/port/status/image) |
 | POST | `/api/v1/sites` | Deploy site |
-| GET | `/api/v1/containers` | List containers |
-| POST | `/api/v1/containers/:name/exec` | Execute command in container |
-| GET | `/api/v1/containers/:name/logs` | Container logs |
-| GET | `/api/v1/containers/:name/inspect` | Container inspect JSON |
-| POST | `/api/v1/containers/:name/start` | Start container |
-| POST | `/api/v1/containers/:name/stop` | Stop container |
-| POST | `/api/v1/containers/:name/restart` | Restart container |
+| GET | `/api/v1/containers` | List containers (`?show_all=true`) |
+| GET | `/api/v1/containers/:name/logs` | Logs (`?tail=N`) |
+| POST | `/api/v1/containers/:name/exec` | **Streaming** exec — body `{"cmd":"..."}` |
+| GET | `/api/v1/containers/:name/inspect` | Inspect JSON |
+| POST | `/api/v1/containers/:name/start\|stop\|restart` | Lifecycle |
 | DELETE | `/api/v1/containers/:name/remove` | Remove container |
+
+### Runners
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/v1/runners` | List runners |
 | POST | `/api/v1/runners/add` | Add runner |
-| POST | `/api/v1/runners/:name/edit` | Edit runner labels |
+| POST | `/api/v1/runners/:name/edit` | Edit labels |
 | GET | `/api/v1/runners/:name/logs` | Runner logs |
-| POST | `/api/v1/runners/:name/restart` | Restart runner |
-| POST | `/api/v1/runners/:name/stop` | Stop runner |
+| POST | `/api/v1/runners/:name/start\|stop\|restart` | Lifecycle |
 | DELETE | `/api/v1/runners/:name` | Remove runner |
-| GET | `/api/v1/cluster/status` | Aggregate cluster status (all nodes, parallel) |
-| GET | `/api/v1/servers` | List cluster servers |
-| POST | `/api/v1/servers` | Add server to cluster |
+
+### Cluster
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/cluster/status` | Aggregate all nodes (parallel) |
+| GET | `/api/v1/servers` | List nodes |
+| POST | `/api/v1/servers` | Add node |
 | PUT | `/api/v1/servers/:id` | Update node (name/host/port/user/pass) |
-| DELETE | `/api/v1/servers/:id` | Remove server |
+| DELETE | `/api/v1/servers/:id` | Remove node |
 | GET | `/api/v1/servers/:id/ping` | Ping one node |
 | GET | `/api/v1/servers/:id/status` | Remote status |
-| GET | `/api/v1/servers/:id/sites` | Remote managed sites |
-| POST | `/api/v1/servers/:id/deploy` | Deploy site on remote node |
-| GET | `/api/v1/servers/:id/sites/:name/logs` | Remote site logs |
+| GET | `/api/v1/servers/:id/sites` | Remote sites |
+| POST | `/api/v1/servers/:id/deploy` | Deploy on remote node |
 | GET | `/api/v1/servers/:id/containers` | Remote containers |
+| GET | `/api/v1/servers/:id/containers/:name/logs` | Remote logs (streamed) |
+| POST | `/api/v1/servers/:id/containers/:name/exec` | Remote **streaming** exec |
+| GET | `/api/v1/servers/:id/sites/:name/logs` | Remote site logs (streamed) |
 | GET | `/api/v1/servers/:id/runners` | Remote runners |
-| POST | `/api/v1/servers/:id/containers/:name/exec` | Remote exec |
+| GET | `/api/v1/servers/:id/runners/:name/logs` | Remote runner logs (streamed) |
+| POST/DELETE | `/api/v1/servers/:id/containers/:name/...` | Remote lifecycle proxy |
 
-### Login example
+### Examples
 
 ```bash
+# login
 curl -X POST http://localhost:9090/api/v1/login \
   -H "Content-Type: application/json" \
   -d '{"username":"<user>","password":"<pass>"}'
-# Returns: {"status":"ok","token":"<token>"}
-```
+# → {"status":"ok","token":"<token>"}
 
-### Container exec example
-
-```bash
-curl -X POST http://localhost:9090/api/v1/containers/my-site-php/exec \
+# exec
+curl -N -X POST http://localhost:9090/api/v1/containers/my-site-php/exec \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"ls /var/www"}'
+
+# cluster aggregate
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:9090/api/v1/cluster/status
 ```
 
 ## Runner Labels
 
-Labels determine which workflow runs on which server. Format: `label:host`
+Format: `label:host` — determines which workflow runs on which node.
 
-| Label | Server | Sites |
-|-------|--------|-------|
-| `my-site:host` | node-4 | my-app (example.com) |
-| `web:host` | node-web | site-alpha, site-beta |
-| `worker:host` | node-app | worker, worker-old |
+| Label | Node |
+|-------|------|
+| `web` | web node |
+| `app` | app node |
+| `ci` | build node |
 
 ### Workflow example
 
@@ -243,75 +254,61 @@ on:
     branches: [main]
 jobs:
   deploy:
-    runs-on: web            # label раннера
+    runs-on: web            # runner label
     env:
-      PORT: 8084                 # внешний порт сайта
+      PORT: 8084                 # host port
     steps:
       - uses: actions/checkout@v4
-      - run: deploy              # язык определится сам
+      - run: deploy              # language auto-detected
 ```
 
-Для PHP-сайтов, которым нужен свой web-сервер, укажите `TYPE: php`
-(шаблон поднимает nginx + php-fpm в одном контейнере) или положите
-свой `Dockerfile` — deploy-stack использует его автоматически.
+For PHP sites needing their own webserver set `TYPE: php`
+(nginx + php-fpm in one container) or drop a `Dockerfile` — auto-detected.
 
 ## Forgejo Runner Setup
 
-### Prerequisites
-
-- Forgejo instance with Actions enabled
-- Runner token from Forgejo admin panel (Site Administration → Actions → Runners)
-
-### Register runner (одной командой)
-
 ```bash
 cd /root/deploy-stack
-./deploy add-runner web <REGISTRATION_TOKEN> --url http://git.example.com:3000
+./deploy add-runner web <REGISTRATION_TOKEN> --url http://forgejo:3000
 ```
 
-Раннер сам поднимется в контейнере, установит docker-cli/rsync/node, слинкует
-`deploy` и запустится с указанными label'ами. Для каждого сервера — свой label:
-
-| Сервер | Label |
-|--------|-------|
-| node-4 | `my-site:host` |
-| node-web | `web:host` |
-| node-app | `worker:host` |
-
-### Runner docker-compose
-
-Раннер включён в `docker-compose.yml` (профиль `ci`): он монтирует
-`/var/run/docker.sock`, `./www` и `./deploy-data` (ради бинаря `deploy`).
+Runner comes up in a container with docker-cli/rsync/node, links `deploy`,
+and uses the given labels. Runner is also in `docker-compose.yml` (profile `ci`)
+and mounts `/var/run/docker.sock`, `./www`, `./deploy-data`.
 
 ## Cluster Management
 
-Add remote deploy-stack servers to manage them from one UI:
+1. **Cluster** tab → **+ Node**
+2. Name, Host (IP), API Port, Login, Password → **Connect**
+3. Node card: **manage** / **ping** / **edit** / **rm**
+4. **manage** → Containers / Sites / Runners / System — full control
+   (term, start/stop/restart/rm, open↗)
+5. **All sites** — every site on every node with the same controls;
+   open↗ uses the **node's host**, not the panel host
 
-1. Go to **Cluster** tab
-2. Click **+** → Add Server
-3. Enter: Name, Host (IP), API Port, Login, Password
-4. Click **Connect**
-5. Click **manage** to open full control panel
-
-The panel shows all containers and runners on the remote server with exec, logs, start/stop/restart controls.
+Remote exec/logs are **streamed** (live output in Terminal).
 
 ## Updating
 
 ```bash
 cd /root/deploy-stack
 git pull
-# если панель запущена через docker compose:
-docker compose up -d --build
-# если как systemd-сервис на хосте:
+docker compose up -d --build          # if compose
+# or host binary:
 CGO_ENABLED=0 go build -ldflags="-s -w" -o deploy . && systemctl restart deploy-stack
 ```
 
+**Production deploy note (this cluster):** only replace
+`/root/deploy-stack/deploy`, `/root/deploy-stack/deploy-data/deploy`, and
+`static/index.html`, then `docker restart deploy-stack` — never touch site
+containers or `.env`.
+
 ## Supported Languages (auto-detected)
 
-| Language | Dockerfile | Внутренний порт |
-|----------|------------|------------------|
+| Language | Base image | Internal port |
+|----------|------------|---------------|
 | Static HTML | nginx:alpine | 80 |
-| PHP 8.2 | nginx + php-fpm (в одном контейнере) | 80 |
+| PHP 8.2 | nginx + php-fpm | 80 |
 | Python 3.12 / Django / Flask / FastAPI | python:3.12-alpine | 8000 |
 | Node.js 20 | node:20-alpine | 3000 |
 | Bun | oven/bun:alpine | 3000 |

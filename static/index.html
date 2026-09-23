@@ -16,11 +16,12 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 .ni{max-width:1080px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:12px;height:44px}
 .logo{font-size:1rem;font-weight:700;color:var(--accent);white-space:nowrap;cursor:default}.logo span{color:var(--t2)}
 .nt{display:flex;margin:0 auto;gap:0}
-.ntb{padding:0 16px;height:44px;display:flex;align-items:center;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;transition:color .15s}
+.ntb{padding:0 14px;height:44px;display:flex;align-items:center;font-size:13px;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;transition:color .15s}
 .ntb:hover{color:var(--t0)}.ntb.a{color:var(--accent);border-bottom-color:var(--accent)}
-.st{display:flex;gap:14px;font-size:12px;color:var(--t2);white-space:nowrap}.st b{color:var(--t0)}
+.st{display:flex;gap:12px;font-size:12px;color:var(--t2);white-space:nowrap}.st b{color:var(--t0)}
 .b{font-size:11px;padding:4px 10px;font-weight:500;white-space:nowrap;border:1px solid var(--br2);background:transparent;color:var(--t1);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .12s;border-radius:0}
 .b:hover{border-color:var(--accent);color:var(--t0)}
+.b:disabled{opacity:.5;cursor:not-allowed}
 .b-p{background:var(--accent);color:#fff;border-color:var(--accent)}.b-p:hover{opacity:.85}
 .b-y{background:rgba(221,215,119,.1);color:var(--t0);border-color:rgba(221,215,119,.25)}
 .b-r{background:rgba(221,119,119,.08);color:var(--t0);border-color:rgba(221,119,119,.2)}
@@ -28,12 +29,15 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 .ca{margin-left:auto;display:flex;gap:3px;flex-wrap:wrap}
 .sh{display:flex;align-items:center;gap:10px;margin:20px 0 12px;flex-wrap:wrap}
 .sh-t{font-size:13px;color:var(--t2);font-weight:500}
+.search{padding:5px 9px;background:var(--b2);border:1px solid var(--br1);color:var(--t0);font-size:12px;min-width:160px;font-family:inherit}
+.search:focus{outline:none;border-color:var(--accent)}
 .c{background:var(--b1);border:1px solid var(--br1);padding:10px 12px;margin-bottom:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;transition:border-color .15s}
 .c:hover{border-color:var(--br2)}
 .cn{font-weight:600;font-size:13px;min-width:80px}
 .cm{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:2px 6px;background:var(--ag);color:var(--accent);border:1px solid rgba(122,157,184,.15);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 .cv{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--t1)}
 .tag{display:inline-block;font-size:10px;padding:1px 5px;border:1px solid var(--br2);color:var(--t2);margin-left:4px}
+.tag-node{background:var(--ag);color:var(--accent);border-color:rgba(122,157,184,.3)}
 .sb{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;font-weight:500;border-radius:0}
 .sb-on{background:rgba(119,153,64,.15);color:#8cb88c;border:1px solid rgba(119,153,64,.3)}
 .sb-off{background:rgba(221,119,119,.08);color:#c47a7a;border:1px solid rgba(221,119,119,.2)}
@@ -64,7 +68,24 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 .srv-item:hover{border-color:var(--br2)}
 .sv-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .sv-dot.g{background:#6ba76b}.sv-dot.r{background:#c47a7a}
-@media(max-width:600px){.c{flex-direction:column;align-items:flex-start;gap:6px}.ca{margin-left:0;width:100%}.ca .b{flex:1}.nt{overflow-x:auto}.ntb{padding:0 10px;font-size:12px;height:38px}.st{display:none}.ni{gap:6px}}
+.sv-dot.y{background:#c4b86b}
+#toasts{position:fixed;top:52px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:360px}
+.toast{background:var(--b1);border:1px solid var(--br2);border-left:3px solid var(--accent);padding:10px 14px;font-size:13px;color:var(--t0);box-shadow:0 4px 16px rgba(0,0,0,.35);animation:tin .15s ease}
+.toast.ok{border-left-color:#6ba76b}
+.toast.err{border-left-color:#c47a7a}
+@keyframes tin{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+.a-link{color:var(--accent);text-decoration:none;font-size:11px;padding:4px 8px;border:1px solid rgba(122,157,184,.35);display:inline-flex;align-items:center;gap:3px}
+.a-link:hover{background:var(--ag)}
+.node-card{background:var(--b1);border:1px solid var(--br1);padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.node-card.on{border-left:3px solid rgba(119,153,64,.5)}
+.node-card.off{border-left:3px solid rgba(221,119,119,.4)}
+.node-stats{display:flex;gap:10px;font-size:11px;color:var(--t1);flex-wrap:wrap}
+.node-stats b{color:var(--t0);font-weight:600}
+.seg{display:flex;border:1px solid var(--br2)}
+.seg button{border:none;border-right:1px solid var(--br2);background:transparent;color:var(--t1);font-size:11px;padding:5px 12px;cursor:pointer;font-family:inherit}
+.seg button:last-child{border-right:none}
+.seg button.a{background:var(--accent);color:#fff}
+@media(max-width:600px){.c{flex-direction:column;align-items:flex-start;gap:6px}.ca{margin-left:0;width:100%}.ca .b{flex:1}.nt{overflow-x:auto}.ntb{padding:0 10px;font-size:12px;height:38px}.st{display:none}.ni{gap:6px}.node-card{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -82,23 +103,43 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
     <div class="logo">deploy<span>-stack</span></div>
     <div class="nt">
       <div class="ntb a" onclick="tab('containers')">Containers</div>
+      <div class="ntb" onclick="tab('sites')">Sites</div>
       <div class="ntb" onclick="tab('cluster')">Cluster</div>
       <div class="ntb" onclick="tab('runners')">Runners</div>
       <div class="ntb" onclick="tab('settings')">Settings</div>
     </div>
-    <div class="st"><span>Containers: <b id="nC">0</b></span><span>Runners: <b id="nR">0</b></span><span>Nodes: <b id="nSR">0</b></span></div>
+    <div class="st"><span>Sites: <b id="nS">0</b></span><span>Containers: <b id="nC">0</b></span><span>Runners: <b id="nR">0</b></span><span>Nodes: <b id="nSR">0</b></span></div>
   </div></nav>
   <div class="w">
     <div id="p-containers">
-      <div class="sh"><span class="sh-t">Containers</span><button class="b" onclick="loadContainers()">Refresh</button></div>
+      <div class="sh"><span class="sh-t">Containers</span>
+        <input class="search" id="qC" placeholder="Search…" oninput="loadContainers()">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--t2);cursor:pointer"><input type="checkbox" id="autoC" onchange="toggleAuto('C')" style="width:14px;height:14px">auto</label>
+        <button class="b" onclick="loadContainers()">Refresh</button></div>
       <div id="containers"></div><div id="ce" class="emp">No containers.</div>
     </div>
+    <div id="p-sites" style="display:none">
+      <div class="sh"><span class="sh-t">Sites</span>
+        <input class="search" id="qS" placeholder="Search…" oninput="loadSites()">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--t2);cursor:pointer"><input type="checkbox" id="autoS" onchange="toggleAuto('S')" style="width:14px;height:14px">auto</label>
+        <button class="b" onclick="loadSites()">Refresh</button></div>
+      <div id="sites"></div><div id="se" class="emp">No sites.</div>
+    </div>
     <div id="p-cluster" style="display:none">
-      <div class="sh"><span class="sh-t">Cluster Nodes</span><button class="b" onclick="loadCluster()">Refresh</button></div>
+      <div class="sh"><span class="sh-t">Cluster</span>
+        <div class="seg">
+          <button id="segNodes" class="a" onclick="clusterView('nodes')">Nodes</button>
+          <button id="segAll" onclick="clusterView('all')">All sites</button>
+        </div>
+        <button class="b" onclick="loadCluster(true)">Refresh</button>
+        <button class="b b-p" onclick="showModal('mSrv')">+ Node</button></div>
       <div id="servers"></div><div id="sre" class="emp">No remote servers.</div>
+      <div id="allSites" style="display:none"></div><div id="ase" class="emp" style="display:none">No sites on cluster.</div>
     </div>
     <div id="p-runners" style="display:none">
-      <div class="sh"><span class="sh-t">CI/CD Runners</span><button class="b" onclick="loadRunners()">Refresh</button></div>
+      <div class="sh"><span class="sh-t">CI/CD Runners</span>
+        <input class="search" id="qR" placeholder="Search…" oninput="loadRunners()">
+        <button class="b" onclick="loadRunners()">Refresh</button></div>
       <div id="runners"></div><div id="re" class="emp">No runners.</div>
     </div>
     <div id="p-settings" style="display:none">
@@ -125,16 +166,19 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
       </div>
     </div>
   </div>
-  <button class="ab" onclick="addClick()">+</button>
+  <button class="ab" onclick="addClick()" title="Add">+</button>
 </div>
+
+<div id="toasts"></div>
 
 <div class="mbg" id="mAdd" onclick="if(event.target===this)hideModal('mAdd')"><div class="md">
   <h2>Deploy Site</h2>
   <div class="fg"><label>Name</label><input id="fN" placeholder="mysite"></div>
+  <div class="fg"><label>Target node</label><select id="fNode"><option value="">this node (local)</option></select></div>
   <div class="fg"><label>Directory</label><input id="fD" placeholder="/var/www/mysite"></div>
   <div class="fg"><label>Port (empty = auto)</label><input id="fP" type="number" placeholder="auto"></div>
   <div class="fg"><label>Type</label><select id="fT"><option value="">auto-detect</option><option value="static">Static</option><option value="php">PHP</option><option value="python">Python</option><option value="node">Node.js</option><option value="go">Go</option></select></div>
-  <div class="fa"><button class="b" onclick="hideModal('mAdd')">Cancel</button><button class="b b-p" onclick="addSite()">Deploy</button></div>
+  <div class="fa"><button class="b" onclick="hideModal('mAdd')">Cancel</button><button class="b b-p" id="btnDeploy" onclick="addSite()">Deploy</button></div>
 </div></div>
 
 <div class="mbg" id="mSrv" onclick="if(event.target===this)hideModal('mSrv')"><div class="md">
@@ -145,6 +189,17 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
   <div class="fg"><label>Login</label><input id="sU" placeholder="admin"></div>
   <div class="fg"><label>Password</label><input id="sW" type="password"></div>
   <div class="fa"><button class="b" onclick="hideModal('mSrv')">Cancel</button><button class="b b-p" onclick="addServer()">Connect</button></div>
+</div></div>
+
+<div class="mbg" id="mEditSrv" onclick="if(event.target===this)hideModal('mEditSrv')"><div class="md">
+  <h2>Edit Node: <span id="esName"></span></h2>
+  <input type="hidden" id="esId">
+  <div class="fg"><label>Name</label><input id="esHN"></div>
+  <div class="fg"><label>Host (IP)</label><input id="esHH"></div>
+  <div class="fg"><label>API Port</label><input id="esHP" type="number"></div>
+  <div class="fg"><label>Login</label><input id="esHU"></div>
+  <div class="fg"><label>Password (empty = keep)</label><input id="esHW" type="password"></div>
+  <div class="fa"><button class="b" onclick="hideModal('mEditSrv')">Cancel</button><button class="b b-p" onclick="saveEditSrv()">Save</button></div>
 </div></div>
 
 <div class="mbg" id="mRun" onclick="if(event.target===this)hideModal('mRun')"><div class="md">
@@ -173,7 +228,7 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 </div></div>
 
 <div class="mbg" id="mEditSite" onclick="if(event.target===this)hideModal('mEditSite')"><div class="md">
-  <h2>Edit: <span id="esName"></span></h2>
+  <h2>Edit: <span id="esName2"></span></h2>
   <input type="hidden" id="esC">
   <div class="fg"><label>Host Port</label><input id="esPort" type="number" placeholder="8090"></div>
   <div class="fg"><label>Bind IP</label><input id="esIP" placeholder="0.0.0.0"></div>
@@ -218,10 +273,19 @@ initAccent();setTheme(localStorage.getItem('ds-t')||'dark');
 
 var T=localStorage.getItem('ds-tk')||'';
 function $(id){return document.getElementById(id)}
-function e(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function e(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML}
 function esc(s){return encodeURIComponent(s)}
 function showModal(id){$(id).classList.add('on')}
 function hideModal(id){$(id).classList.remove('on')}
+
+/* ── Toasts ── */
+function toast(msg,kind){
+  var d=document.createElement('div');
+  d.className='toast '+(kind||'');
+  d.textContent=msg;
+  $('toasts').appendChild(d);
+  setTimeout(function(){d.style.opacity='0';d.style.transition='opacity .3s';setTimeout(function(){d.remove()},350)},kind==='err'?6000:3500);
+}
 
 function api(method,url,body){
   var opts={method:method,headers:{}};
@@ -230,22 +294,57 @@ function api(method,url,body){
   if(body)opts.body=JSON.stringify(body);
   return fetch(url,opts).then(function(r){
     if(r.status===401){showLogin();throw new Error('401')}
-    if(!r.ok)return r.json().then(function(d){throw new Error(d.error||r.status)});
+    if(!r.ok)return r.json().then(function(d){throw new Error(d.error||r.status)}).catch(function(){throw new Error('HTTP '+r.status)});
     var ct=r.headers.get('content-type')||'';
-    if(ct.indexOf('json')>=0)return r.json();return r.text();
+    if(ct.indexOf('json')>=0)return r.json();
+    return r.text();
   });
 }
-function doLogin(){fetch('/api/v1/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('iU').value,password:$('iP').value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem('ds-tk',T);showMain()}else alert(d.error||'Invalid credentials')}).catch(function(){alert('Connection error')})}
+function doLogin(){fetch('/api/v1/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('iU').value,password:$('iP').value})}).then(function(r){return r.json()}).then(function(d){if(d.token){T=d.token;localStorage.setItem('ds-tk',T);showMain()}else toast(d.error||'Invalid credentials','err')}).catch(function(){toast('Connection error','err')})}
 function showLogin(){$('lp').style.display='flex';$('mp').style.display='none'}
-function showMain(){$('lp').style.display='none';$('mp').style.display='block';loadAll();initShowAll();loadStatus()}
+function showMain(){$('lp').style.display='none';$('mp').style.display='block';loadAll();initShowAll();loadStatus();startAuto()}
 
 var curTab='containers';
-var tabs=[['containers','p-containers'],['cluster','p-cluster'],['runners','p-runners'],['settings','p-settings']];
-function tab(n){curTab=n;document.querySelectorAll('.ntb').forEach(function(t,i){t.classList.toggle('a',tabs[i][0]===n)});tabs.forEach(function(t){var el=$(t[1]);if(el)el.style.display=t[0]===n?'block':'none'})}
-function addClick(){if(curTab==='containers')showModal('mAdd');if(curTab==='cluster')showModal('mSrv');if(curTab==='runners')showModal('mRun')}
-function loadAll(){loadContainers();loadCluster();loadRunners()}
+var tabs=[['containers','p-containers'],['sites','p-sites'],['cluster','p-cluster'],['runners','p-runners'],['settings','p-settings']];
+function tab(n){
+  curTab=n;
+  document.querySelectorAll('.ntb').forEach(function(t,i){t.classList.toggle('a',tabs[i][0]===n)});
+  tabs.forEach(function(t){var el=$(t[1]);if(el)el.style.display=t[0]===n?'block':'none'});
+  if(n==='sites')loadSites();
+  if(n==='cluster')loadCluster(false);
+  if(n==='containers')loadContainers();
+  if(n==='runners')loadRunners();
+}
+function addClick(){
+  if(curTab==='containers'||curTab==='sites'){fillNodeSelect();showModal('mAdd')}
+  if(curTab==='cluster')showModal('mSrv');
+  if(curTab==='runners')showModal('mRun');
+}
+function loadAll(){loadContainers();loadSites();loadCluster(true);loadRunners()}
 function initShowAll(){$('showAll').checked=localStorage.getItem('ds-showall')==='1'}
 function toggleShowAll(){localStorage.setItem('ds-showall',$('showAll').checked?'1':'0');loadContainers()}
+
+/* auto-refresh */
+var autoTimers={};
+function toggleAuto(k){
+  var on=$('auto'+k).checked;
+  localStorage.setItem('ds-auto'+k,on?'1':'0');
+  if(autoTimers['auto'+k]){clearInterval(autoTimers['auto'+k]);autoTimers['auto'+k]=null}
+  if(on)startAutoK(k);
+}
+function startAutoK(k){
+  if(autoTimers['auto'+k])clearInterval(autoTimers['auto'+k]);
+  autoTimers['auto'+k]=setInterval(function(){
+    if(document.hidden)return;
+    if(k==='C'&&curTab==='containers')loadContainers();
+    if(k==='S'&&curTab==='sites')loadSites();
+  },10000);
+}
+function startAuto(){
+  ['C','S'].forEach(function(k){
+    if(localStorage.getItem('ds-auto'+k)==='1'){$('auto'+k).checked=true;startAutoK(k)}
+  });
+}
 
 /* ── Status helpers ── */
 function isUp(s){return s&&(s.indexOf('Up')>=0||s==='running'||s==='online')}
@@ -255,7 +354,7 @@ function statusBadge(s){
   var txt='unknown';
   if(s){
     if(s.indexOf('Up')>=0) txt=s.split(' ').slice(0,3).join(' ');
-    else if(s==='running'||s==='online'||s==='exited') txt=s;
+    else if(s==='running'||s==='online'||s==='exited'||s==='stopped') txt=s;
     else txt=s.split(' ')[0];
   }
   return'<div class="sb '+cls+'">'+e(txt)+'</div>';
@@ -265,15 +364,22 @@ function dot(on){return'<div class="sv-dot '+(on?'g':'r')+'"></div>'}
 /* ── Containers ── */
 function loadContainers(){
   var showAll=localStorage.getItem('ds-showall')==='1';
+  var q=($('qC').value||'').toLowerCase();
   api('GET','/api/v1/containers?show_all='+showAll).then(function(s){
-    s=s||[];$('nC').textContent=s.length;
+    s=s||[];
+    if(q)s=s.filter(function(x){return (x.name+' '+(x.image||'')+' '+(x.ports||'')).toLowerCase().indexOf(q)>=0});
+    $('nC').textContent=s.length;
     $('ce').style.display=s.length?'none':'block';
     $('containers').innerHTML=s.map(function(x){
       var up=isUp(x.status);
       var n=esc(x.name);
       function K(l,a,c){return'<button class="b'+c+'" onclick="'+a+'">'+l+'</button>';}
+      var openBtn='';
+      var pm=String(x.ports||'').match(/^(\d+)->/);
+      if(pm)openBtn='<a class="a-link" href="http://'+location.hostname+':'+pm[1]+'" target="_blank" rel="noopener">open ↗</a>';
       var ctrls=
-          K('exec',"doExec('"+n+"')",'')
+          openBtn
+        + K('exec',"doExec('"+n+"')",'')
         + K('logs',"doLogs('"+n+"','"+esc(x.name)+"')",'')
         + K('info',"doInspect('"+n+"','"+esc(x.name)+"')",'')
         + (x.managed?K('edit',"openEdit('"+n+"','"+esc(x.name)+"','"+esc(x.ports||'')+"')",''):'')
@@ -290,48 +396,333 @@ function loadContainers(){
   }).catch(function(er){$('containers').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 
+/* ── Sites ── */
+function loadSites(){
+  var q=($('qS').value||'').toLowerCase();
+  api('GET','/api/v1/sites').then(function(s){
+    s=s||[];
+    if(q)s=s.filter(function(x){return String(x.name||x).toLowerCase().indexOf(q)>=0});
+    $('nS').textContent=s.length;
+    $('se').style.display=s.length?'none':'block';
+    $('sites').innerHTML=s.map(function(x){
+      var name=typeof x==='string'?x:x.name;
+      var status=typeof x==='string'?'':(x.status||'');
+      var port=typeof x==='string'?0:(x.port||0);
+      var image=typeof x==='string'?'':(x.image||'');
+      var up=isUp(status);
+      var n=esc(name);
+      var openBtn=port?'<a class="a-link" href="http://'+location.hostname+':'+port+'" target="_blank" rel="noopener">:'+port+' ↗</a>':'';
+      function K(l,a,c){return'<button class="b'+c+'" onclick="'+a+'">'+l+'</button>';}
+      var ctrls=openBtn
+        +K('logs',"doLogs('"+n+"','"+esc(name)+"')",'')
+        +K('exec',"doExec('"+n+"')",'')
+        +(up?(K('restart',"doAction('"+n+"','restart')",' b-y')+K('stop',"doAction('"+n+"','stop')",' b-r'))
+            :K('start',"doAction('"+n+"','start')",' b-g'))
+        +K('rm',"doRemove('"+n+"','"+esc(name)+"')",' b-r');
+      return'<div class="c" style="border-left:3px solid '+(up?'rgba(119,153,64,.5)':'rgba(221,119,119,.4)')+'">'
+        +'<div class="cn">'+e(name)+'</div>'
+        +(image?'<div class="cm" title="'+esc(image)+'">'+e(image)+'</div>':'')
+        +statusBadge(status||'?')
+        +'<div class="ca">'+ctrls+'</div></div>';
+    }).join('');
+  }).catch(function(er){$('sites').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
+}
+
 function doLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/containers/'+n+'/logs?tail=500').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
 function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')})}
-function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){setTimeout(loadContainers,1000)})}
-function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){setTimeout(loadContainers,1000)})}
-function openEdit(n,name,portsStr){$('esName').textContent=name;$('esC').value=n;var pg='';var m=String(portsStr).match(/(\d+)->/);if(!m)m=String(portsStr).match(/->(\d+)/);if(m)pg=m[1];$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
-function saveEditSite(){var n=$('esC').value,port=parseInt($('esPort').value)||0,hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');setTimeout(loadContainers,1500)}).catch(function(er){alert('Error: '+e(String(er)))})}
+function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
+function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){toast(name+' removed','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
+function openEdit(n,name,portsStr){$('esName2').textContent=name;$('esC').value=n;var pg='';var m=String(portsStr).match(/(\d+)->/);if(!m)m=String(portsStr).match(/->(\d+)/);if(m)pg=m[1];$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
+function saveEditSite(){var n=$('esC').value,port=parseInt($('esPort').value)||0,hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');toast('Saved','ok');setTimeout(function(){loadContainers();loadSites()},1500)}).catch(function(er){toast(String(er),'err')})}
 function doExec(n){$('execName').textContent=unescape(decodeURIComponent(n));$('execCmd').value='';$('execOut').textContent='';$('execOut').classList.remove('on');showModal('mExec');setTimeout(function(){$('execCmd').focus()},100)}
 function runExec(){var n=esc($('execName').textContent),cmd=$('execCmd').value;if(!cmd)return;var out=$('execOut');out.classList.add('on');out.textContent='Running: '+cmd+'\n';fetch('/api/v1/containers/'+n+'/exec',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+T},body:JSON.stringify({cmd:cmd})}).then(function(r){return r.text()}).then(function(t){out.textContent+=t}).catch(function(er){out.textContent+='Error: '+er})}
-function addSite(){var n=$('fN').value;if(!n)return alert('Name required');api('POST','/api/v1/sites',{name:n,dir:$('fD').value||'/var/www/'+n,port:parseInt($('fP').value)||0,type:$('fT').value}).then(function(){hideModal('mAdd');setTimeout(loadContainers,3000)}).catch(function(er){alert(e(String(er)))})}
+
+/* ── Deploy site (local or remote node) ── */
+function fillNodeSelect(){
+  var sel=$('fNode');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">this node (local)</option>';
+  api('GET','/api/v1/servers').then(function(list){
+    (list||[]).forEach(function(x){
+      var o=document.createElement('option');
+      o.value=x.id;o.textContent=x.name+' ('+x.host+')';
+      sel.appendChild(o);
+    });
+    if(cur)sel.value=cur;
+  }).catch(function(){});
+}
+function addSite(){
+  var n=$('fN').value;if(!n){toast('Name required','err');return}
+  var btn=$('btnDeploy');btn.disabled=true;btn.textContent='Deploying…';
+  var body={name:n,dir:$('fD').value||'/var/www/'+n,port:parseInt($('fP').value)||0,type:$('fT').value};
+  var nodeId=$('fNode').value;
+  var req=nodeId
+    ? api('POST','/api/v1/servers/'+nodeId+'/deploy',body)
+    : api('POST','/api/v1/sites',body);
+  req.then(function(r){
+    hideModal('mAdd');btn.disabled=false;btn.textContent='Deploy';
+    var port=r&&r.port?':'+r.port:'';
+    toast(n+' deployed'+port,'ok');
+    setTimeout(function(){loadContainers();loadSites();if(curTab==='cluster')loadCluster(false)},800);
+  }).catch(function(er){
+    btn.disabled=false;btn.textContent='Deploy';
+    toast('Deploy failed: '+er,'err');
+  });
+}
 
 /* ── Cluster ── */
-function loadCluster(){api('GET','/api/v1/servers').then(function(s){
-  s=s||[];$('nSR').textContent=s.length;$('sre').style.display=s.length?'none':'block';
-  $('servers').innerHTML=s.map(function(x){
+var clusterMode='nodes';
+var clusterData=null;
+
+function clusterView(m){
+  clusterMode=m;
+  $('segNodes').classList.toggle('a',m==='nodes');
+  $('segAll').classList.toggle('a',m==='all');
+  $('servers').style.display=m==='nodes'?'block':'none';
+  $('sre').style.display=m==='nodes'&&!clusterHasNodes()?'block':'none';
+  $('allSites').style.display=m==='all'?'block':'none';
+  if(m==='all')loadAllClusterSites();
+}
+
+function clusterHasNodes(){return clusterData&&clusterData.nodes&&clusterData.nodes.length}
+
+function loadCluster(full){
+  // full=true — тяжёлый агрегат (кластер-status); иначе быстрый список серверов
+  if(full===true){
+    $('servers').innerHTML='<div class="emp">Loading cluster…</div>';
+    api('GET','/api/v1/cluster/status').then(function(st){
+      clusterData=st;
+      renderClusterNodes(st);
+      $('nSR').textContent=(st.online!=null?st.online+'/'+st.total:(st.nodes||[]).length);
+      if(clusterMode==='all')loadAllClusterSites();
+      fillNodeSelectCounts(st);
+    }).catch(function(er){
+      $('servers').innerHTML='<div class="emp">Error: '+e(String(er))+'</div>';
+    });
+  }else{
+    api('GET','/api/v1/servers').then(function(list){
+      list=list||[];
+      $('nSR').textContent=list.length;
+      $('sre').style.display=list.length?'none':'block';
+      // если ещё нет агрегата — рендерим простые карточки
+      if(!clusterData||!clusterData.nodes||!clusterData.nodes.length){
+        renderClusterNodes({nodes:list.map(function(x){
+          return{id:x.id,name:x.name,host:x.host,port:x.port,online:x.online,last_ping:x.last_ping};
+        }),total:list.length,online:list.filter(function(x){return x.online}).length});
+      }else{
+        renderClusterNodes(clusterData);
+      }
+      fillNodeSelectCounts(clusterData);
+    }).catch(function(){});
+  }
+}
+
+function fillNodeSelectCounts(st){
+  // синхронизируем select в форме Deploy
+  var sel=$('fNode');
+  if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">this node (local)</option>';
+  ((st&&st.nodes)||clusterServers||[]).forEach(function(x){
+    var o=document.createElement('option');
+    o.value=x.id;
+    var cnt=x.sites?x.sites.length:null;
+    o.textContent=x.name+' ('+(x.host||'')+(cnt!=null?' · '+cnt+' sites':'')+')'+(x.online===false?' · offline':'');
+    sel.appendChild(o);
+  });
+  if(cur)sel.value=cur;
+}
+
+var clusterServers=[];
+
+function renderClusterNodes(st){
+  var nodes=(st&&st.nodes)||[];
+  if(!nodes.length){
+    $('servers').innerHTML='';
+    $('sre').style.display='block';
+    return;
+  }
+  $('sre').style.display='none';
+  clusterServers=nodes;
+  $('servers').innerHTML=nodes.map(function(x){
     var on=x.online;
-    return'<div class="c" style="border-left:3px solid '+(on?'rgba(119,153,64,.5)':'rgba(221,119,119,.4)')+'">'
+    var sites=x.sites||[];
+    var runners=x.runners||[];
+    var cCount=x.containers!=null?x.containers:0;
+    var isStr=typeof sites[0]==='string'||sites.length===0;
+    var siteCnt=sites.length;
+    return'<div class="node-card '+(on?'on':'off')+'">'
       +dot(on)
-      +'<div class="cn">'+e(x.name)+'</div>'
-      +'<div class="cm">'+e(x.host)+':'+x.port+'</div>'
+      +'<div class="cn" style="min-width:90px">'+e(x.name)+'</div>'
+      +'<div class="cm">'+e(x.host)+':'+e(x.port)+'</div>'
       +statusBadge(on?'online':'offline')
+      +'<div class="node-stats">'
+        +'<span>sites <b>'+siteCnt+'</b></span>'
+        +'<span>containers <b>'+cCount+'</b></span>'
+        +'<span>runners <b>'+runners.length+'</b></span>'
+        +(x.version?'<span>v'+e(x.version)+'</span>':'')
+      +'</div>'
+      +(x.error?'<div class="cv" style="color:#c47a7a;font-size:11px;flex-basis:100%">'+e(x.error)+'</div>':'')
       +'<div class="ca">'
       +'<button class="b b-p" onclick="openSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">manage</button>'
-      +'<button class="b" onclick="pingSrv(\''+esc(x.id)+'\')">ping</button>'
+      +'<button class="b" onclick="pingOne(\''+esc(x.id)+'\')">ping</button>'
+      +'<button class="b" onclick="editSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\',\''+esc(x.host)+'\','+(x.port||3000)+')">edit</button>'
       +'<button class="b b-r" onclick="rmSrv(\''+esc(x.id)+'\',\''+esc(x.name)+'\')">rm</button>'
       +'</div></div>';
   }).join('');
-}).catch(function(){})}
-function addServer(){var n=$('sN').value,h=$('sH').value;if(!n||!h)return alert('Name and host required');api('POST','/api/v1/servers',{name:n,host:h,port:parseInt($('sP').value)||3000,user:$('sU').value,pass:$('sW').value}).then(function(){hideModal('mSrv');setTimeout(loadCluster,1000)}).catch(function(er){alert(e(String(er)))})}
-function rmSrv(id,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id).then(function(){loadCluster()})}
-function pingSrv(id){api('GET','/api/v1/servers').then(function(){loadCluster()}).catch(function(){})}
+}
+
+function loadAllClusterSites(){
+  var box=$('allSites');
+  box.innerHTML='<div class="emp">Loading all sites…</div>';
+  $('ase').style.display='none';
+  api('GET','/api/v1/servers').then(function(list){
+    list=list||[];
+    if(!list.length){box.innerHTML='';$('ase').style.display='block';return}
+    var pending=list.length;
+    var rows=[];
+    list.forEach(function(s){
+      api('GET','/api/v1/servers/'+s.id+'/sites').then(function(sites){
+        (sites||[]).forEach(function(x){
+          var name=typeof x==='string'?x:x.name;
+          rows.push({
+            node:s.name, nodeId:s.id, online:s.online!==false,
+            name:name,
+            status:typeof x==='string'?'':(x.status||''),
+            port:typeof x==='string'?0:(x.port||0)
+          });
+        });
+      }).catch(function(){
+        rows.push({node:s.name,nodeId:s.id,online:false,name:'(offline)',status:'',port:0,err:true});
+      }).then(function(){
+        pending--;
+        if(pending===0)renderAllSites(rows);
+      });
+    });
+  }).catch(function(er){box.innerHTML='<div class="emp">Error: '+e(String(er))+'</div>'});
+}
+
+function renderAllSites(rows){
+  var q='';
+  var box=$('allSites');
+  if(!rows.length){box.innerHTML='';$('ase').style.display='block';return}
+  $('ase').style.display='none';
+  rows.sort(function(a,b){return a.node===b.node?a.name.localeCompare(b.name):a.node.localeCompare(b.node)});
+  box.innerHTML='<div class="sh"><span class="sh-t">All sites ('+rows.length+')</span><input class="search" id="qA" placeholder="Search…" oninput="filterAllSites()"></div><div id="allSitesList">'
+    +rows.map(function(x,i){
+      var up=isUp(x.status);
+      var openBtn=x.port&&x.online?'<a class="a-link" href="http://'+location.hostname+':'+x.port+'" target="_blank" rel="noopener">:'+x.port+' ↗</a>':'';
+      return'<div class="c all-row" data-q="'+e((x.node+' '+x.name).toLowerCase())+'" style="border-left:3px solid '+(up?'rgba(119,153,64,.5)':(x.online?'rgba(221,215,119,.35)':'rgba(221,119,119,.4)'))+'">'
+        +'<div class="cn">'+e(x.name)+'</div>'
+        +'<span class="tag tag-node">'+e(x.node)+'</span>'
+        +statusBadge(x.err?'offline':(x.status||'?'))
+        +'<div class="ca">'
+        +openBtn
+        +(x.online&&!x.err?'<button class="b" onclick="openSrv(\''+esc(x.nodeId)+'\',\''+esc(x.node)+'\')">manage</button>':'')
+        +'</div></div>';
+    }).join('')+'</div>';
+}
+
+function filterAllSites(){
+  var q=($('qA').value||'').toLowerCase();
+  document.querySelectorAll('.all-row').forEach(function(el){
+    el.style.display=!q||el.getAttribute('data-q').indexOf(q)>=0?'':'none';
+  });
+}
+
+function addServer(){
+  var n=$('sN').value,h=$('sH').value;
+  if(!n||!h){toast('Name and host required','err');return}
+  var btn=event&&event.target?event.target:null;
+  if(btn){btn.disabled=true;btn.textContent='Connecting…'}
+  api('POST','/api/v1/servers',{name:n,host:h,port:parseInt($('sP').value)||3000,user:$('sU').value,pass:$('sW').value})
+    .then(function(r){
+      hideModal('mSrv');
+      if(btn){btn.disabled=false;btn.textContent='Connect'}
+      if(r&&r.warning)toast(n+' added, login warning: '+r.warning,'err');
+      else toast(n+' connected','ok');
+      setTimeout(function(){loadCluster(true)},400);
+    }).catch(function(er){
+      if(btn){btn.disabled=false;btn.textContent='Connect'}
+      toast(String(er),'err');
+    });
+}
+function rmSrv(id,name){if(!confirm('Remove node '+name+'? (sites on that node are not touched)'))return;api('DELETE','/api/v1/servers/'+id).then(function(){toast(name+' removed','ok');loadCluster(true)}).catch(function(er){toast(String(er),'err')})}
+function pingOne(id){
+  api('GET','/api/v1/servers/'+id+'/ping').then(function(r){
+    toast(r&&r.online? 'online':'offline', r&&r.online?'ok':'err');
+    loadCluster(true);
+  }).catch(function(er){toast(String(er),'err')});
+}
+function editSrv(id,name,host,port){
+  $('esName').textContent=name;$('esId').value=id;
+  $('esHN').value=name;$('esHH').value=host;$('esHP').value=port;
+  api('GET','/api/v1/servers/'+id).then(function(s){
+    if(s){$('esHU').value=s.user||'';$('esHN').value=s.name||name;$('esHH').value=s.host||host;$('esHP').value=s.port||port}
+  }).catch(function(){});
+  $('esHU').value='';$('esHW').value='';
+  showModal('mEditSrv');
+}
+function saveEditSrv(){
+  var id=$('esId').value;
+  api('PUT','/api/v1/servers/'+id,{
+    name:$('esHN').value,host:$('esHH').value,
+    port:parseInt($('esHP').value)||3000,
+    user:$('esHU').value,pass:$('esHW').value
+  }).then(function(r){
+    hideModal('mEditSrv');
+    if(r&&r.warning)toast('Saved, login warning: '+r.warning,'err');
+    else toast('Node updated','ok');
+    loadCluster(true);
+  }).catch(function(er){toast(String(er),'err')});
+}
 
 var curSrvId='',curSrvName='',curSrvTab='containers';
 function openSrv(id,name){curSrvId=id;curSrvName=name;$('srvTitle').textContent=name;showModal('mSrvDetail');srvTab('containers')}
 function srvTab(t){curSrvTab=t;srvRefresh()}
 function srvNavHTML(){
   var h='<div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap">';
-  [['containers','Containers'],['runners','Runners'],['system','System']].forEach(function(p){
+  [['containers','Containers'],['sites','Sites'],['runners','Runners'],['system','System']].forEach(function(p){
     h+='<button class="b'+(curSrvTab===p[0]?' b-p':'')+'" onclick="srvTab(\''+p[0]+'\')">'+p[1]+'</button>';
   });
   return h+'</div>';
 }
-function srvRefresh(){var id=curSrvId;if(!id)return;$('srvBody').innerHTML=srvNavHTML()+'<div style="padding:12px;color:var(--t2)">Loading…</div>';if(curSrvTab==='containers')srvLoadC(id);else if(curSrvTab==='runners')srvLoadR(id);else srvLoadSys(id)}
+function srvRefresh(){var id=curSrvId;if(!id)return;$('srvBody').innerHTML=srvNavHTML()+'<div style="padding:12px;color:var(--t2)">Loading…</div>';
+  if(curSrvTab==='containers')srvLoadC(id);
+  else if(curSrvTab==='runners')srvLoadR(id);
+  else if(curSrvTab==='sites')srvLoadSites(id);
+  else srvLoadSys(id)}
+
+function srvLoadSites(id){
+  api('GET','/api/v1/servers/'+id+'/sites').then(function(ss){
+    ss=ss||[];var h=srvNavHTML();
+    if(!ss.length)h+='<div class="emp">No sites</div>';
+    ss.forEach(function(x){
+      var name=typeof x==='string'?x:x.name;
+      var status=typeof x==='string'?'':(x.status||'');
+      var port=typeof x==='string'?0:(x.port||0);
+      var up=isUp(status);var n=esc(name);var si=esc(id);
+      var openBtn=port?'<a class="a-link" href="http://'+location.hostname+':'+port+'" target="_blank" rel="noopener">:'+port+' ↗</a>':'';
+      h+='<div class="srv-item" style="border-left:3px solid '+(up?'rgba(119,153,64,.4)':'rgba(221,119,119,.3)')+'">'
+        +'<div class="cn">'+e(name)+'</div>'
+        +statusBadge(status||'?')
+        +'<div class="ca">'
+        +openBtn
+        +'<button class="b" onclick="srvSiteLogs(\''+si+'\',\''+n+'\',\''+e(name)+'\')">logs</button>'
+        +(up?'<button class="b b-y" onclick="srvAction(\''+si+'\',\''+n+'\',\'restart\')">restart</button><button class="b b-r" onclick="srvAction(\''+si+'\',\''+n+'\',\'stop\')">stop</button>'
+             :'<button class="b b-g" onclick="srvAction(\''+si+'\',\''+n+'\',\'start\')">start</button>')
+        +'<button class="b b-r" onclick="srvRemove(\''+si+'\',\''+n+'\',\''+e(name)+'\')">rm</button>'
+        +'</div></div>';
+    });
+    $('srvBody').innerHTML=h;
+  }).catch(function(er){$('srvBody').innerHTML=srvNavHTML()+'<div class="emp">Error: '+e(String(er))+'</div>'});
+}
+
+function srvSiteLogs(id,cn,name){
+  api('GET','/api/v1/servers/'+id+'/sites/'+cn+'/logs?tail=300').then(function(t){
+    $('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on');
+  }).catch(function(er){$('lb').textContent='Error: '+er;$('mLog').classList.add('on')});
+}
 
 function srvLoadC(id){
   api('GET','/api/v1/servers/'+id+'/containers').then(function(cc){
@@ -385,25 +776,28 @@ function srvLoadSys(id){
     var h=srvNavHTML()
       +'<div class="srv-sec"><h3>System Info</h3></div>'
       +'<div class="srv-item"><div class="cn">Version</div>'+dot(true)+'<span class="cv">'+e(st.version||'?')+'</span></div>'
-      +'<div class="srv-item"><div class="cn">Containers</div>'+dot(cnt>0)+'<span class="cv" style="color:'+(cnt>0?'#8cb88c':'var(--t2)')+'">'+cnt+' running</span></div>'
+      +'<div class="srv-item"><div class="cn">Containers</div>'+dot(cnt>0)+'<span class="cv" style="color:'+(cnt>0?'#8cb88c':'var(--t2)')+'">'+cnt+'</span></div>'
       +'<div class="srv-item"><div class="cn">Runners</div>'+dot(runs.length>0)+'<div class="cv" style="color:'+(runs.length>0?'#8cb88c':'var(--t2)')+'">'+e((runs||[]).join(', ')||'none')+'</div></div>'
-      +'<div class="srv-item"><div class="cn">Compose Services</div>'+dot(sites.length>0)+'<div class="cv" style="color:'+(sites.length>0?'#8cb88c':'var(--t2)')+'">'+e((sites||[]).join(', ')||'none')+'</div></div>';
+      +'<div class="srv-item"><div class="cn">Sites</div>'+dot(sites.length>0)+'<div class="cv" style="color:'+(sites.length>0?'#8cb88c':'var(--t2)')+'">'+e((sites||[]).join(', ')||'none')+'</div></div>';
     $('srvBody').innerHTML=h;
   }).catch(function(er){$('srvBody').innerHTML=srvNavHTML()+'<div class="emp">Error: '+e(String(er))+'</div>'});
 }
 
-function srvExec(id,cn,name){var cmd=prompt('Command for '+name+':');if(!cmd)return;api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/exec',{cmd:cmd}).then(function(r){$('lb').textContent=typeof r==='string'?r:JSON.stringify(r,null,2);$('logTitle').textContent='Result: '+name;$('mLog').classList.add('on')}).catch(function(er){alert('Error: '+er)})}
+function srvExec(id,cn,name){var cmd=prompt('Command for '+name+':');if(!cmd)return;api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/exec',{cmd:cmd}).then(function(r){$('lb').textContent=typeof r==='string'?r:JSON.stringify(r,null,2);$('logTitle').textContent='Result: '+name;$('mLog').classList.add('on')}).catch(function(er){toast('Error: '+er,'err')})}
 function srvLogs(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/logs?tail=300').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
-function srvInspect(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('logTitle').textContent='Inspect: '+name;$('mInspect').classList.add('on')}).catch(function(er){$('ib').textContent='Error: '+er;$('mInspect').classList.add('on')})}
-function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){setTimeout(srvRefresh,600)})}
-function srvRemove(id,cn,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id+'/containers/'+cn+'/remove').then(function(){setTimeout(srvRefresh,600)})}
-function srvRunnerAct(id,rn,a){api('POST','/api/v1/servers/'+id+'/runners/'+rn+'/'+a).then(function(){setTimeout(srvRefresh,600)})}
+function srvInspect(id,cn,name){api('GET','/api/v1/servers/'+id+'/containers/'+cn+'/inspect').then(function(t){try{t=JSON.stringify(JSON.parse(t),null,2)}catch(x){}$('ib').textContent=t;$('mInspect').classList.add('on')}).catch(function(er){$('ib').textContent='Error: '+er;$('mInspect').classList.add('on')})}
+function srvAction(id,cn,a){api('POST','/api/v1/servers/'+id+'/containers/'+cn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}
+function srvRemove(id,cn,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/servers/'+id+'/containers/'+cn+'/remove').then(function(){toast(name+' removed','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}
+function srvRunnerAct(id,rn,a){api('POST','/api/v1/servers/'+id+'/runners/'+rn+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(srvRefresh,600)}).catch(function(er){toast(String(er),'err')})}
 function srvRunnerLogs(id,rn,name){api('GET','/api/v1/servers/'+id+'/runners/'+rn+'/logs?tail=300').then(function(t){$('lb').textContent=t;$('logTitle').textContent='Logs: '+name;$('mLog').classList.add('on')}).catch(function(er){$('lb').textContent='Error: '+er})}
 
 /* ── Runners ── */
 function loadRunners(){
+  var q=($('qR').value||'').toLowerCase();
   api('GET','/api/v1/runners').then(function(r){
-    r=r||[];$('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';
+    r=r||[];
+    if(q)r=r.filter(function(x){return (x.name+' '+(x.labels||'')).toLowerCase().indexOf(q)>=0});
+    $('nR').textContent=r.length;$('re').style.display=r.length?'none':'block';
     if(!r.length){$('runners').innerHTML='';return}
     $('runners').innerHTML=r.map(function(x){
       var up=isUp(x.status);var n=esc(x.name);var lbl=x.labels?e(x.labels):'—';
@@ -423,12 +817,12 @@ function loadRunners(){
     }).join('');
   }).catch(function(){})
 }
-function addRunner(){var n=$('rN').value,u=$('rU').value,t=$('rT').value;if(!n||!u||!t)return alert('Fill all fields');api('POST','/api/v1/runners/add',{name:n,url:u,token:t,labels:$('rL').value,capacity:parseInt($('rCap').value)||1,platform:$('rPlat').value}).then(function(){hideModal('mRun');setTimeout(loadRunners,2000)}).catch(function(er){alert('Error: '+e(String(er)))})}
-function doRunnerRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){setTimeout(loadRunners,1000)})}
-function doRunnerAction(n,a){api('POST','/api/v1/runners/'+n+'/'+a).then(function(){setTimeout(loadRunners,2000)})}
+function addRunner(){var n=$('rN').value,u=$('rU').value,t=$('rT').value;if(!n||!u||!t){toast('Fill all fields','err');return}api('POST','/api/v1/runners/add',{name:n,url:u,token:t,labels:$('rL').value,capacity:parseInt($('rCap').value)||1,platform:$('rPlat').value}).then(function(){hideModal('mRun');toast('Runner created','ok');setTimeout(loadRunners,2000)}).catch(function(er){toast('Error: '+er,'err')})}
+function doRunnerRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/runners/'+n).then(function(){toast(name+' removed','ok');setTimeout(loadRunners,1000)}).catch(function(er){toast(String(er),'err')})}
+function doRunnerAction(n,a){api('POST','/api/v1/runners/'+n+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(loadRunners,2000)}).catch(function(er){toast(String(er),'err')})}
 function doRunnerLogs(n,name){$('logTitle').textContent='Logs: '+name;api('GET','/api/v1/runners/'+n+'/logs').then(function(t){$('lb').textContent=t;$('mLog').classList.add('on')})}
 function editRunner(n,name,labels){$('erName').textContent=name;$('erN').value=n;$('erL').value=labels;showModal('mEditRunner')}
-function saveRunnerEdit(){var n=$('erN').value,labels=$('erL').value;api('POST','/api/v1/runners/'+esc(n)+'/edit',{labels:labels}).then(function(){hideModal('mEditRunner');setTimeout(loadRunners,2000)}).catch(function(er){alert('Error: '+e(String(er)))})}
+function saveRunnerEdit(){var n=$('erN').value,labels=$('erL').value;api('POST','/api/v1/runners/'+esc(n)+'/edit',{labels:labels}).then(function(){hideModal('mEditRunner');toast('Runner updated','ok');setTimeout(loadRunners,2000)}).catch(function(er){toast('Error: '+er,'err')})}
 
 function loadStatus(){api('GET','/api/v1/status').then(function(s){$('stVer').textContent=(s||{}).version||'?'})}
 $('iP').addEventListener('keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();doLogin()}});

@@ -20,11 +20,14 @@ jobs:
 ## Features
 
 - **Zero-config deploy** — `deploy` в CI: имя из репозитория, язык авто, порт из `PORT`/`.deploy`
-- **Containers** — list, exec, logs, inspect, start/stop/restart/remove
-- **Cluster** — карточки серверов + «manage» открывает полноценный менеджер ноды
-  (вкладки Containers / Runners / System, действия exec·logs·start·stop·restart·rm)
+- **Sites tab** — все compose-сайты: порт, статус, open ↗, logs/exec/restart/stop/rm, поиск, auto-refresh
+- **Containers** — list, exec, logs, inspect, start/stop/restart/remove, поиск
+- **Cluster** — карточки нод со счётчиками sites/containers/runners, online/offline,
+  **All sites** (все сайты кластера в одном списке), **Deploy to node** из формы деплоя,
+  edit учёток, ping одной ноды, manage (Containers / Sites / Runners / System)
 - **Runners** — Forgejo/Gitea/GitHub runner management with labels, logs, edit
 - **Settings** — accent color, themes (dark/light/black), show/hide all containers
+- **Toasts** — уведомления вместо alert
 - **Auto-detection** — PHP, Python, Node.js, Go, Rust, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, Bun, Deno
 - **CLI** — `deploy` (auto) / `add` / `rm` / `list` / `logs` / `restart` / `serve` / `add-runner`
 - **Webhook** — auto-deploy on push via Forgejo/Gitea webhooks
@@ -172,6 +175,8 @@ All endpoints require `Authorization: Bearer <token>` header.
 | POST | `/api/v1/login` | Get auth token |
 | POST | `/api/v1/logout` | Invalidate token |
 | GET | `/api/v1/status` | Server status |
+| GET | `/api/v1/sites` | Managed sites (name/port/status/image) |
+| POST | `/api/v1/sites` | Deploy site |
 | GET | `/api/v1/containers` | List containers |
 | POST | `/api/v1/containers/:name/exec` | Execute command in container |
 | GET | `/api/v1/containers/:name/logs` | Container logs |
@@ -187,9 +192,16 @@ All endpoints require `Authorization: Bearer <token>` header.
 | POST | `/api/v1/runners/:name/restart` | Restart runner |
 | POST | `/api/v1/runners/:name/stop` | Stop runner |
 | DELETE | `/api/v1/runners/:name` | Remove runner |
+| GET | `/api/v1/cluster/status` | Aggregate cluster status (all nodes, parallel) |
 | GET | `/api/v1/servers` | List cluster servers |
 | POST | `/api/v1/servers` | Add server to cluster |
+| PUT | `/api/v1/servers/:id` | Update node (name/host/port/user/pass) |
 | DELETE | `/api/v1/servers/:id` | Remove server |
+| GET | `/api/v1/servers/:id/ping` | Ping one node |
+| GET | `/api/v1/servers/:id/status` | Remote status |
+| GET | `/api/v1/servers/:id/sites` | Remote managed sites |
+| POST | `/api/v1/servers/:id/deploy` | Deploy site on remote node |
+| GET | `/api/v1/servers/:id/sites/:name/logs` | Remote site logs |
 | GET | `/api/v1/servers/:id/containers` | Remote containers |
 | GET | `/api/v1/servers/:id/runners` | Remote runners |
 | POST | `/api/v1/servers/:id/containers/:name/exec` | Remote exec |

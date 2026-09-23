@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,6 +26,7 @@ type Server struct {
 }
 
 type ClusterStore struct {
+	mu      sync.Mutex
 	servers []Server
 	dataDir string
 }
@@ -36,53 +38,118 @@ func NewClusterStore(dataDir string) *ClusterStore {
 	return cs
 }
 
+func (cs *ClusterStore) path() string {
+	return filepath.Join(cs.dataDir, "cluster.json")
+}
+
 func (cs *ClusterStore) load() {
-	f := filepath.Join(cs.dataDir, "cluster.json")
-	data, err := os.ReadFile(f)
+	data, err := os.ReadFile(cs.path())
 	if err == nil {
 		json.Unmarshal(data, &cs.servers)
 	}
 }
 
+// save пишет атомарно: tmp + rename, чтобы параллельные запросы
+// не портили cluster.json при обрыве записи.
 func (cs *ClusterStore) save() {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	cs.saveLocked()
+}
+
+func (cs *ClusterStore) saveLocked() {
 	data, _ := json.MarshalIndent(cs.servers, "", "  ")
-	os.WriteFile(filepath.Join(cs.dataDir, "cluster.json"), data, 0600)
+	p := cs.path()
+	tmp := p + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return
+	}
+	os.Rename(tmp, p)
+}
+
+func (cs *ClusterStore) snapshot() []Server {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	out := make([]Server, len(cs.servers))
+	copy(out, cs.servers)
+	return out
 }
 
 func (cs *ClusterStore) AddServer(name, host string, port int, user, pass string) Server {
+	cs.mu.Lock()
 	s := Server{ID: genShortID(), Name: name, Host: host, Port: port, User: user, Pass: pass}
 	cs.servers = append(cs.servers, s)
-	cs.save()
+	cs.saveLocked()
+	cs.mu.Unlock()
 	return s
 }
 
+func (cs *ClusterStore) UpdateServer(id, name, host string, port int, user, pass string) bool {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	for i := range cs.servers {
+		if cs.servers[i].ID == id {
+			s := &cs.servers[i]
+			if name != "" {
+				s.Name = name
+			}
+			if host != "" {
+				s.Host = host
+			}
+			if port > 0 {
+				s.Port = port
+			}
+			if user != "" {
+				s.User = user
+			}
+			// пустой pass = «не менять»
+			if pass != "" {
+				s.Pass = pass
+			}
+			// учётка изменилась — старый токен невалиден
+			s.Token = ""
+			cs.saveLocked()
+			return true
+		}
+	}
+	return false
+}
+
 func (cs *ClusterStore) RemoveServer(id string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 	for i, s := range cs.servers {
 		if s.ID == id {
 			cs.servers = append(cs.servers[:i], cs.servers[i+1:]...)
 			break
 		}
 	}
-	cs.save()
+	cs.saveLocked()
 }
 
 func (cs *ClusterStore) ListServers() []Server {
-	if cs.servers == nil {
+	out := cs.snapshot()
+	if out == nil {
 		return []Server{}
 	}
-	return cs.servers
+	return out
 }
 
 func (cs *ClusterStore) GetServer(id string) *Server {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 	for i := range cs.servers {
 		if cs.servers[i].ID == id {
-			return &cs.servers[i]
+			s := cs.servers[i]
+			return &s
 		}
 	}
 	return nil
 }
 
 func (cs *ClusterStore) UpdateToken(id, token string) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 	for i := range cs.servers {
 		if cs.servers[i].ID == id {
 			cs.servers[i].Token = token
@@ -91,7 +158,20 @@ func (cs *ClusterStore) UpdateToken(id, token string) {
 			break
 		}
 	}
-	cs.save()
+	cs.saveLocked()
+}
+
+func (cs *ClusterStore) setOnline(id string, online bool) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	for i := range cs.servers {
+		if cs.servers[i].ID == id {
+			cs.servers[i].Online = online
+			cs.servers[i].LastPing = time.Now()
+			break
+		}
+	}
+	cs.saveLocked()
 }
 
 func (cs *ClusterStore) LoginServer(id string) error {
@@ -100,7 +180,7 @@ func (cs *ClusterStore) LoginServer(id string) error {
 		return fmt.Errorf("server not found")
 	}
 	url := fmt.Sprintf("http://%s:%d/api/v1/login", s.Host, s.Port)
-	body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, s.User, s.Pass)
+	body := fmt.Sprintf(`{"username":%q,"password":%q}`, s.User, s.Pass)
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Post(url, "application/json", strings.NewReader(body))
 	if err != nil {
@@ -113,7 +193,10 @@ func (cs *ClusterStore) LoginServer(id string) error {
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
 	if result.Error != "" {
-		return fmt.Errorf(result.Error)
+		return fmt.Errorf("%s", result.Error)
+	}
+	if result.Token == "" {
+		return fmt.Errorf("login failed")
 	}
 	cs.UpdateToken(s.ID, result.Token)
 	return nil
@@ -129,39 +212,63 @@ func (cs *ClusterStore) CallServer(id, method, path string, body interface{}) ([
 			return nil, err
 		}
 		s = cs.GetServer(id)
-	}
-
-	url := fmt.Sprintf("http://%s:%d%s", s.Host, s.Port, path)
-	var bodyReader io.Reader
-	if body != nil {
-		data, _ := json.Marshal(body)
-		bodyReader = strings.NewReader(string(data))
-	}
-
-	req, _ := http.NewRequest(method, url, bodyReader)
-	req.Header.Set("Authorization", "Bearer "+s.Token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 401 {
-		if err := cs.LoginServer(id); err != nil {
-			return nil, err
+		if s == nil {
+			return nil, fmt.Errorf("server not found")
 		}
-		req.Header.Set("Authorization", "Bearer "+cs.GetServer(id).Token)
-		resp, err = client.Do(req)
+	}
+
+	call := func(token string) (*http.Response, error) {
+		url := fmt.Sprintf("http://%s:%d%s", s.Host, s.Port, path)
+		var bodyReader io.Reader
+		if body != nil {
+			data, _ := json.Marshal(body)
+			bodyReader = strings.NewReader(string(data))
+		}
+		req, err := http.NewRequest(method, url, bodyReader)
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 30 * time.Second}
+		return client.Do(req)
 	}
 
-	return io.ReadAll(resp.Body)
+	resp, err := call(s.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == 401 {
+		resp.Body.Close()
+		if err := cs.LoginServer(id); err != nil {
+			return nil, err
+		}
+		s = cs.GetServer(id)
+		if s == nil {
+			return nil, fmt.Errorf("server not found")
+		}
+		resp, err = call(s.Token)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		var e struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(data, &e) == nil && e.Error != "" {
+			return data, fmt.Errorf("%s", e.Error)
+		}
+		return data, fmt.Errorf("remote HTTP %d", resp.StatusCode)
+	}
+	return data, nil
 }
 
 func (cs *ClusterStore) PingServer(id string) bool {
@@ -173,21 +280,28 @@ func (cs *ClusterStore) PingServer(id string) bool {
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		s.Online = false
-		cs.save()
+		cs.setOnline(id, false)
 		return false
 	}
-	defer resp.Body.Close()
-	s.Online = resp.StatusCode == 200 || resp.StatusCode == 401
-	s.LastPing = time.Now()
-	cs.save()
-	return s.Online
+	resp.Body.Close()
+	online := resp.StatusCode == 200 || resp.StatusCode == 401
+	cs.setOnline(id, online)
+	return online
 }
 
+// PingAll пингует все ноды параллельно — иначе Refresh в UI
+// ждёт sum(timeout) при нескольких offline-серверах.
 func (cs *ClusterStore) PingAll() {
-	for i := range cs.servers {
-		cs.PingServer(cs.servers[i].ID)
+	servers := cs.snapshot()
+	var wg sync.WaitGroup
+	for _, s := range servers {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			cs.PingServer(id)
+		}(s.ID)
 	}
+	wg.Wait()
 }
 
 func genShortID() string {
@@ -204,11 +318,86 @@ func NewCluster(dataDir string) *Cluster {
 	return &Cluster{store: NewClusterStore(dataDir)}
 }
 
+// handleStatus — агрегатная сводка кластера: все ноды параллельно,
+// у каждой online + счётчики sites/containers/runners.
+func (cl *Cluster) handleStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		jsonErr(w, "GET required", 405)
+		return
+	}
+	servers := cl.store.ListServers()
+	type nodeStatus struct {
+		ID         string    `json:"id"`
+		Name       string    `json:"name"`
+		Host       string    `json:"host"`
+		Port       int       `json:"port"`
+		Online     bool      `json:"online"`
+		LastPing   time.Time `json:"last_ping"`
+		Error      string    `json:"error,omitempty"`
+		Containers int       `json:"containers"`
+		Sites      []string  `json:"sites"`
+		Runners    []string  `json:"runners"`
+		Version    string    `json:"version,omitempty"`
+	}
+	out := make([]nodeStatus, len(servers))
+	var wg sync.WaitGroup
+	for i, s := range servers {
+		wg.Add(1)
+		go func(i int, s Server) {
+			defer wg.Done()
+			ns := nodeStatus{
+				ID: s.ID, Name: s.Name, Host: s.Host, Port: s.Port,
+				Online: s.Online, LastPing: s.LastPing,
+				Sites: []string{}, Runners: []string{},
+			}
+			data, err := cl.store.CallServer(s.ID, "GET", "/api/v1/status", nil)
+			if err != nil {
+				ns.Online = false
+				ns.Error = err.Error()
+				out[i] = ns
+				return
+			}
+			var st struct {
+				Containers int      `json:"containers"`
+				Sites      []string `json:"sites"`
+				Runners    []string `json:"runners"`
+				Version    string   `json:"version"`
+			}
+			if json.Unmarshal(data, &st) == nil {
+				ns.Online = true
+				ns.Containers = st.Containers
+				if st.Sites != nil {
+					ns.Sites = st.Sites
+				}
+				if st.Runners != nil {
+					ns.Runners = st.Runners
+				}
+				ns.Version = st.Version
+			}
+			out[i] = ns
+		}(i, s)
+	}
+	wg.Wait()
+	online := 0
+	for _, n := range out {
+		if n.Online {
+			online++
+		}
+	}
+	jsonResp(w, map[string]interface{}{
+		"nodes":   out,
+		"total":   len(out),
+		"online":  online,
+		"version": "1.5.0",
+	})
+}
+
 func (cl *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		cl.store.PingAll()
-		jsonResp(w, cl.store.ListServers())
+		// быстрый список: пинг в фоне, UI обновит статусы отдельным refresh
+		servers := cl.store.ListServers()
+		jsonResp(w, servers)
 	case "POST":
 		var req struct {
 			Name string `json:"name"`
@@ -221,28 +410,46 @@ func (cl *Cluster) handleServers(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "invalid json", 400)
 			return
 		}
+		if req.Name == "" || req.Host == "" {
+			jsonErr(w, "name and host required", 400)
+			return
+		}
 		if req.Port == 0 {
 			req.Port = 3000
 		}
 		s := cl.store.AddServer(req.Name, req.Host, req.Port, req.User, req.Pass)
-		cl.store.LoginServer(s.ID)
-		jsonResp(w, map[string]string{"status": "added", "id": s.ID})
+		// пробный login — но не блокируем добавление при ошибке
+		loginErr := ""
+		if err := cl.store.LoginServer(s.ID); err != nil {
+			loginErr = err.Error()
+		}
+		resp := map[string]string{"status": "added", "id": s.ID}
+		if loginErr != "" {
+			resp["warning"] = loginErr
+		}
+		jsonResp(w, resp)
 	}
 }
 
 func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/servers/"), "/")
-	if len(parts) < 1 {
+	if len(parts) < 1 || parts[0] == "" {
 		jsonErr(w, "invalid", 400)
 		return
 	}
 	id := parts[0]
 
-	// Proxy container operations to remote servers
+	// ── агрегированные действия над одной нодой ──
 	if len(parts) >= 2 {
 		action := parts[1]
 
-		// ── агрегированная сводка сервера ──
+		if action == "ping" && r.Method == "GET" {
+			ok := cl.store.PingServer(id)
+			s := cl.store.GetServer(id)
+			jsonResp(w, map[string]interface{}{"online": ok, "server": s})
+			return
+		}
+
 		if action == "status" && r.Method == "GET" {
 			data, err := cl.store.CallServer(id, "GET", "/api/v1/status", nil)
 			if err != nil {
@@ -278,17 +485,58 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// GET /servers/:id/sites — compose-сервисы удалённой ноды
+		if action == "sites" && r.Method == "GET" {
+			data, err := cl.store.CallServer(id, "GET", "/api/v1/sites", nil)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
+
+		// POST /servers/:id/deploy — деплой сайта на удалённую ноду
+		if action == "deploy" && r.Method == "POST" {
+			var body map[string]interface{}
+			if err := jsonDec(r, &body); err != nil {
+				jsonErr(w, "invalid json", 400)
+				return
+			}
+			data, err := cl.store.CallServer(id, "POST", "/api/v1/sites", body)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
+
+		// GET /servers/:id/sites/:sname/logs — логи сайта по compose-сервису
+		if action == "sites" && len(parts) >= 4 && parts[3] == "logs" && r.Method == "GET" {
+			sname := parts[2]
+			tail := r.URL.Query().Get("tail")
+			if tail == "" {
+				tail = "300"
+			}
+			data, err := cl.store.CallServer(id, "GET", "/api/v1/containers/"+sname+"/logs?tail="+tail, nil)
+			if err != nil {
+				jsonErr(w, err.Error(), 502)
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write(data)
+			return
+		}
+
 		// Proxy /servers/:id/containers/:cname/*
 		if action == "containers" && len(parts) >= 3 {
 			cname := parts[2]
 			rest := ""
 			if len(parts) > 3 {
 				rest = "/" + strings.Join(parts[3:], "/")
-			}
-
-			method := r.Method
-			if method == "GET" && rest == "" {
-				method = "GET"
 			}
 
 			path := "/api/v1/containers/" + cname + rest
@@ -301,12 +549,17 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			data, err := cl.store.CallServer(id, method, path, body)
+			data, err := cl.store.CallServer(id, r.Method, path, body)
 			if err != nil {
 				jsonErr(w, err.Error(), 502)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json")
+			// логи/inspects — text, остальное json
+			if strings.HasSuffix(rest, "/logs") || strings.HasSuffix(rest, "/exec") {
+				w.Header().Set("Content-Type", "text/plain")
+			} else {
+				w.Header().Set("Content-Type", "application/json")
+			}
 			w.Write(data)
 			return
 		}
@@ -319,12 +572,24 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 				rest = "/" + strings.Join(parts[3:], "/")
 			}
 			path := "/api/v1/runners/" + rname + rest
-			data, err := cl.store.CallServer(id, r.Method, path, nil)
+
+			var body interface{}
+			if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+				var b map[string]interface{}
+				if jsonDec(r, &b) == nil {
+					body = b
+				}
+			}
+			data, err := cl.store.CallServer(id, r.Method, path, body)
 			if err != nil {
 				jsonErr(w, err.Error(), 502)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json")
+			if strings.HasSuffix(rest, "/logs") {
+				w.Header().Set("Content-Type", "text/plain")
+			} else {
+				w.Header().Set("Content-Type", "application/json")
+			}
 			w.Write(data)
 			return
 		}
@@ -333,6 +598,36 @@ func (cl *Cluster) handleServer(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "DELETE" {
 		cl.store.RemoveServer(id)
 		jsonResp(w, map[string]string{"status": "removed"})
+		return
+	}
+
+	// PUT — редактирование учётки/адреса ноды
+	if r.Method == "PUT" {
+		var req struct {
+			Name string `json:"name"`
+			Host string `json:"host"`
+			Port int    `json:"port"`
+			User string `json:"user"`
+			Pass string `json:"pass"`
+		}
+		if err := jsonDec(r, &req); err != nil {
+			jsonErr(w, "invalid json", 400)
+			return
+		}
+		if !cl.store.UpdateServer(id, req.Name, req.Host, req.Port, req.User, req.Pass) {
+			jsonErr(w, "not found", 404)
+			return
+		}
+		// пробный re-login
+		warning := ""
+		if err := cl.store.LoginServer(id); err != nil {
+			warning = err.Error()
+		}
+		resp := map[string]string{"status": "updated"}
+		if warning != "" {
+			resp["warning"] = warning
+		}
+		jsonResp(w, resp)
 		return
 	}
 

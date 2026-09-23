@@ -243,6 +243,23 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
   <div class="fa"><button class="b" onclick="hideModal('mEditSite')">Cancel</button><button class="b b-p" onclick="saveEditSite()">Save & Recreate</button></div>
 </div></div>
 
+<div class="mbg" id="mSiteCustom" onclick="if(event.target===this)hideModal('mSiteCustom')"><div class="md">
+  <h2>Customize: <span id="scName"></span></h2>
+  <input type="hidden" id="scSite">
+  <div class="fg"><label>Tools / packages (space or comma separated — apk, alpine)</label>
+    <input id="scTools" placeholder="curl git openssh-client rsync jq sqlite"></div>
+  <div class="fg"><label>Extra env (one KEY=VALUE per line)</label>
+    <textarea id="scEnv" rows="4" placeholder="APP_ENV=production&#10;API_KEY=..."></textarea></div>
+  <div class="fg"><label>Volumes (one host:container[:ro] per line — like site-volumes.conf)</label>
+    <textarea id="scVols" rows="3" placeholder="/etc/ssh/vps:/etc/deploy-secrets/vps:ro"></textarea></div>
+  <div class="term-hint" style="margin-bottom:8px">Applied on redeploy: Save then the site rebuilds with tools/env/volumes.</div>
+  <div class="fa">
+    <button class="b" onclick="hideModal('mSiteCustom')">Cancel</button>
+    <button class="b" onclick="saveSiteCustom(false)">Save only</button>
+    <button class="b b-p" onclick="saveSiteCustom(true)">Save & Redeploy</button>
+  </div>
+</div></div>
+
 <div class="lbg" id="mTerm" onclick="if(event.target===this)hideModal('mTerm')"><div class="lb">
   <div class="term-hd">
     <div class="term-meta">
@@ -442,6 +459,7 @@ function loadSites(){
       function K(l,a,c){return'<button class="b'+c+'" onclick="'+a+'">'+l+'</button>';}
       var ctrls=openBtn
         +K('term',"doLogs('"+n+"','"+esc(name)+"')",' b-p')
+        +K('cfg',"openSiteCustom('"+n+"','"+esc(name)+"')",'')
         +(up?(K('restart',"doAction('"+n+"','restart')",' b-y')+K('stop',"doAction('"+n+"','stop')",' b-r'))
             :K('start',"doAction('"+n+"','start')",' b-g'))
         +K('rm',"doRemove('"+n+"','"+esc(name)+"')",' b-r');
@@ -459,6 +477,45 @@ function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function()
 function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){toast(name+' removed','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
 function openEdit(n,name,portsStr){$('esName2').textContent=name;$('esC').value=n;var pg='';var m=String(portsStr).match(/(\d+)->/);if(!m)m=String(portsStr).match(/->(\d+)/);if(m)pg=m[1];$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
 function saveEditSite(){var n=$('esC').value,port=parseInt($('esPort').value)||0,hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');toast('Saved','ok');setTimeout(function(){loadContainers();loadSites()},1500)}).catch(function(er){toast(String(er),'err')})}
+
+/* ── Site customization (tools / env / volumes) ── */
+function openSiteCustom(n,name){
+  $('scName').textContent=name;
+  $('scSite').value=n;
+  $('scTools').value='';
+  $('scEnv').value='';
+  $('scVols').value='';
+  showModal('mSiteCustom');
+  api('GET','/api/v1/sites/'+encodeURIComponent(n)+'/custom').then(function(c){
+    c=c||{};
+    $('scTools').value=(c.tools||[]).join(' ');
+    var env=c.env||{},ek=Object.keys(env).sort();
+    $('scEnv').value=ek.map(function(k){return k+'='+env[k]}).join('\n');
+    $('scVols').value=(c.volumes||[]).join('\n');
+  }).catch(function(){});
+}
+function saveSiteCustom(apply){
+  var n=$('scSite').value;
+  var tools=$('scTools').value.split(/[\s,]+/).filter(Boolean);
+  var env={};
+  ($('scEnv').value||'').split('\n').forEach(function(line){
+    line=line.trim(); if(!line||line[0]==='#')return;
+    var i=line.indexOf('='); if(i<=0)return;
+    env[line.slice(0,i).trim()]=line.slice(i+1).trim();
+  });
+  var vols=($('scVols').value||'').split('\n').map(function(s){return s.trim()}).filter(Boolean);
+  var btns=document.querySelectorAll('#mSiteCustom .fa .b');
+  btns.forEach(function(b){b.disabled=true});
+  api('POST','/api/v1/sites/'+encodeURIComponent(n)+'/custom',{tools:tools,env:env,volumes:vols,apply:!!apply}).then(function(r){
+    btns.forEach(function(b){b.disabled=false});
+    hideModal('mSiteCustom');
+    toast((r&&r.status==='applied')?'Saved & redeployed':'Saved','ok');
+    setTimeout(function(){loadSites();loadContainers()},1500);
+  }).catch(function(er){
+    btns.forEach(function(b){b.disabled=false});
+    toast(String(er),'err');
+  });
+}
 
 /* ── Terminal (logs + exec) — local & cluster ── */
 var termCtx=null;

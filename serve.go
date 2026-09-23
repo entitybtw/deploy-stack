@@ -304,7 +304,71 @@ func startWebServer(port int) {
 		if strings.HasSuffix(name, "/remove") && r.Method == "DELETE" {
 			name = strings.TrimSuffix(name, "/remove")
 			removeSite(serviceName(name))
+			_ = saveSiteCustom(serviceName(name), SiteCustom{})
 			jsonResp(w, map[string]string{"status": "removed"})
+			return
+		}
+		if strings.HasSuffix(name, "/custom") {
+			name = strings.TrimSuffix(name, "/custom")
+			safe := serviceName(name)
+			switch r.Method {
+			case "GET":
+				jsonResp(w, getSiteCustom(safe))
+				return
+			case "POST", "PUT":
+				var req struct {
+					Tools   []string          `json:"tools"`
+					Env     map[string]string `json:"env"`
+					Volumes []string          `json:"volumes"`
+					Apply   bool              `json:"apply"`
+				}
+				if err := jsonDec(r, &req); err != nil {
+					jsonErr(w, "invalid json", 400)
+					return
+				}
+				// нормализация: пустые строки в списках/tools
+				var tools []string
+				for _, t := range req.Tools {
+					if t = strings.TrimSpace(t); t != "" {
+						tools = append(tools, t)
+					}
+				}
+				var vols []string
+				for _, v := range req.Volumes {
+					if v = strings.TrimSpace(v); v != "" {
+						vols = append(vols, v)
+					}
+				}
+				env := map[string]string{}
+				for k, v := range req.Env {
+					if k = strings.TrimSpace(k); k != "" {
+						env[k] = v
+					}
+				}
+				if err := saveSiteCustom(safe, SiteCustom{Tools: tools, Env: env, Volumes: vols}); err != nil {
+					jsonErr(w, err.Error(), 500)
+					return
+				}
+				resp := map[string]interface{}{"status": "saved", "name": name}
+				if req.Apply {
+					dir, port, ok := siteComposeInfo(safe)
+					if !ok {
+						jsonErr(w, "site not found in compose — save only", 400)
+						return
+					}
+					lang := detectLang(dir)
+					actual, err := deploySite(name, dir, port, lang)
+					if err != nil {
+						jsonErr(w, err.Error(), 400)
+						return
+					}
+					resp["status"] = "applied"
+					resp["port"] = actual
+				}
+				jsonResp(w, resp)
+				return
+			}
+			jsonErr(w, "method not allowed", 405)
 			return
 		}
 		jsonErr(w, "unknown", 404)
@@ -467,7 +531,7 @@ func startWebServer(port int) {
 			"containers": len(listContainers(false)),
 			"sites":      listServices(),
 			"runners":    runnerNames(),
-			"version":    "1.5.1",
+			"version":    "1.5.2",
 		})
 	}))
 
@@ -527,7 +591,7 @@ func startWebServer(port int) {
 	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	log.Printf("deploy-stack v1.5.1 on :%d", port)
+	log.Printf("deploy-stack v1.5.2 on :%d", port)
 	log.Printf("Web:  http://localhost:%d", port)
 	log.Printf("API:  http://localhost:%d/api/v1/", port)
 	log.Fatal(http.ListenAndServe(addr, mux))

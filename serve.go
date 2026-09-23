@@ -254,7 +254,18 @@ func startWebServer(port int) {
 	// ── Sites (deploy-stack compose-managed) ──
 	mux.HandleFunc("/api/v1/sites", authReq(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
-			json.NewEncoder(w).Encode(listServices())
+			names := listServices()
+			out := make([]map[string]interface{}, 0, len(names))
+			for _, name := range names {
+				out = append(out, map[string]interface{}{
+					"name":   name,
+					"status": getContainerStatus(name),
+					"port":   containerHostPort(name),
+					"image":  getContainerImage(name),
+				})
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(out)
 			return
 		}
 		if r.Method == "POST" {
@@ -442,6 +453,7 @@ func startWebServer(port int) {
 	// ── Cluster ──
 	mux.HandleFunc("/api/v1/servers", authReq(cl.handleServers))
 	mux.HandleFunc("/api/v1/servers/", authReq(cl.handleServer))
+	mux.HandleFunc("/api/v1/cluster/status", authReq(cl.handleStatus))
 
 	// ── Health (no auth) ──
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +467,7 @@ func startWebServer(port int) {
 			"containers": len(listContainers(false)),
 			"sites":      listServices(),
 			"runners":    runnerNames(),
-			"version":    "1.4.0",
+			"version":    "1.5.0",
 		})
 	}))
 
@@ -515,7 +527,7 @@ func startWebServer(port int) {
 	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	log.Printf("deploy-stack v1.4.0 on :%d", port)
+	log.Printf("deploy-stack v1.5.0 on :%d", port)
 	log.Printf("Web:  http://localhost:%d", port)
 	log.Printf("API:  http://localhost:%d/api/v1/", port)
 	log.Fatal(http.ListenAndServe(addr, mux))

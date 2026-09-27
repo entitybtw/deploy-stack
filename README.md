@@ -2,24 +2,26 @@
 
 Universal Docker deployment platform with web UI, API, multi-node cluster management, and Forgejo CI/CD runners.
 
-**Zero-config deploy:** в репозитории достаточно указать label раннера (`runs-on`) и порт —
-`deploy-stack` сам определит язык, соберёт контейнер и поднимет сайт.
+**Zero-config deploy:** в workflow достаточно указать `runs-on` — остальное
+`deploy-stack` делает сам: определяет язык, собирает контейнер, поднимает сайт.
 
 ```yaml
 name: Deploy
 on: { push: { branches: [main] } }
 jobs:
   deploy:
-    runs-on: web        # label раннера
-    env: { PORT: 8084 }      # внешний порт сайта
+    runs-on: my-runner
     steps:
       - uses: actions/checkout@v4
       - run: deploy
 ```
 
+Порт, имя и тип задаются (по желанию) файлом `.deploy` в корне репозитория —
+см. [`.deploy` file](#deploy-file-optional).
+
 ## Features
 
-### Web UI (v1.5.3)
+### Web UI (v0.0.2)
 
 | Tab | What you get |
 |-----|--------------|
@@ -50,9 +52,9 @@ jobs:
 ```
 Host
 ├── Forgejo (git.example.com) + Actions
-├── node-web      :9090  + N sites  + runner label: web
-├── node-app      :9090  + N sites  + runner label: app
-└── node-ci   :9090  + N sites     + runner label: ci
+├── node-a  :9090  + N sites  + runner label: a
+├── node-b  :9090  + N sites  + runner label: b
+└── node-c  :9090  + N sites  + runner label: c
          ↑
     All nodes join one Cluster (manage from any panel)
 ```
@@ -104,19 +106,18 @@ docker compose up -d --build
 
 ### 4. First login
 
-Open `http://SERVER:PORT` → default `admin` / `admin`.
-
-Change password:
-
-```bash
-DEPLOY_ADMIN_PASS=your-password /root/deploy-stack/deploy serve --port 9090
-```
+Open `http://SERVER:PORT` and sign in with the credentials set in `.env`
+(`DEPLOY_ADMIN_USER` / `DEPLOY_ADMIN_PASS`). `install.sh` generates a random
+password for you.
 
 ## CLI
 
 ```bash
 deploy                                  # auto-deploy current repo (CI)
 deploy --port 8084 [--name N --type T]  # auto-deploy with flags
+deploy --tools git,curl --env K=V --volumes /h:/c:ro
+                                        # container settings (see below)
+deploy version                          # print version
 deploy add <name> <dir> [--port N]      # add site (auto language)
 deploy rm <name>                        # remove site
 deploy list                             # sites: port + status
@@ -130,6 +131,25 @@ deploy up / down                        # start/stop all
 deploy serve --port 3000                # panel (web UI + API)
 ```
 
+#### Auto-deploy flags (CI)
+
+Priority: **flag > env > `.deploy` file > auto-detect**.
+
+| Flag | Env | Meaning |
+|------|-----|---------|
+| `--port N` | `PORT` / `DEPLOY_PORT` | host port (else `.deploy` PORT, else free port) |
+| `--name N` | `DEPLOY_SITE` | site name (else `NAME` / repo name / dir) |
+| `--type T` | `DEPLOY_TYPE` | `static\|php\|python\|node\|go\|...` (else `TYPE` / detect) |
+| `--dir D` | `DEPLOY_DIR` | source dir (else `GITHUB_WORKSPACE`) |
+| `--tools a,b` | `DEPLOY_TOOLS` | packages installed into the image (apk/apt) |
+| `--env K=V` | `DEPLOY_ENV` | container env, repeatable (`A=1,B=2`) |
+| `--volumes h:c[:ro]` | `DEPLOY_VOLUMES` | extra container mounts, comma-separated |
+| `--bind A` | `DEPLOY_BIND` | address the container publishes on (default `0.0.0.0`) |
+| `--host IP` | `DEPLOY_HOST` | IP printed in the “deployed” URL |
+
+Tools/env/volumes are applied **for this deploy only** (on top of the panel's
+per-site customization) — nothing is written to `site-custom.json`.
+
 ### `.deploy` file (optional)
 
 Put in repo root — then workflow only needs `runs-on`:
@@ -137,7 +157,13 @@ Put in repo root — then workflow only needs `runs-on`:
 ```
 NAME=my-site
 PORT=8084
-TYPE=static      # static | php | python | node | go
+TYPE=static                # static | php | python | node | go
+
+# container settings (same as --tools/--volumes/--env)
+TOOLS=git,curl
+VOLUMES=/srv/keys:/etc/app/keys:ro
+ENV_APP_ENV=production
+ENV_DEBUG=0
 ```
 
 ### Per-site extra volumes (secrets/keys)
@@ -220,20 +246,20 @@ All endpoints require `Authorization: Bearer <token>`.
 ### Examples
 
 ```bash
-# login
-curl -X POST http://localhost:9090/api/v1/login \
+# login → {"status":"ok","token":"<token>"}
+TOKEN=$(curl -sX POST http://localhost:9090/api/v1/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"<user>","password":"<pass>"}'
-# → {"status":"ok","token":"<token>"}
+  -d '{"username":"'"$DEPLOY_ADMIN_USER"'","password":"'"$DEPLOY_ADMIN_PASS"'"}' \
+  | sed -E 's/.*"token":"([^"]+)".*/\1/')
 
 # exec
 curl -N -X POST http://localhost:9090/api/v1/containers/my-site-php/exec \
-  -H "Authorization: Bearer <token>" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"cmd":"ls /var/www"}'
 
 # cluster aggregate
-curl -H "Authorization: Bearer <token>" \
+curl -H "Authorization: Bearer $TOKEN" \
   http://localhost:9090/api/v1/cluster/status
 ```
 
@@ -251,27 +277,24 @@ Format: `label:host` — determines which workflow runs on which node.
 
 ```yaml
 name: Deploy
-on:
-  push:
-    branches: [main]
+on: { push: { branches: [main] } }
 jobs:
   deploy:
-    runs-on: web            # runner label
-    env:
-      PORT: 8084                 # host port
+    runs-on: web
     steps:
       - uses: actions/checkout@v4
-      - run: deploy              # language auto-detected
+      - run: deploy
 ```
 
-For PHP sites needing their own webserver set `TYPE: php`
-(nginx + php-fpm in one container) or drop a `Dockerfile` — auto-detected.
+Port, name and type live in the `.deploy` file (see above) — no `env:` block
+needed. For PHP sites needing their own webserver set `TYPE=php` there
+(nginx + php-fpm in one container), or drop a `Dockerfile` — auto-detected.
 
 ## Forgejo Runner Setup
 
 ```bash
 cd /root/deploy-stack
-./deploy add-runner web <REGISTRATION_TOKEN> --url http://forgejo:3000
+./deploy add-runner my-runner <REGISTRATION_TOKEN> --url http://forgejo:3000
 ```
 
 Runner comes up in a container with docker-cli/rsync/node, links `deploy`,
@@ -300,10 +323,11 @@ docker compose up -d --build          # if compose
 CGO_ENABLED=0 go build -ldflags="-s -w" -o deploy . && systemctl restart deploy-stack
 ```
 
-**Production deploy note (this cluster):** only replace
-`/root/deploy-stack/deploy`, `/root/deploy-stack/deploy-data/deploy`, and
-`static/index.html`, then `docker restart deploy-stack` — never touch site
-containers or `.env`.
+> **Note:** the panel runs the host-mounted binary
+> (`/root/deploy-stack/deploy-data/deploy`), not the one inside the image.
+> When updating, replace that binary (and `static/index.html` if the UI
+> changed), then `docker restart deploy-stack`. Never touch site containers
+> or `.env`.
 
 ## Supported Languages (auto-detected)
 

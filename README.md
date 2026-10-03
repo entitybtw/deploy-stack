@@ -2,8 +2,9 @@
 
 Universal Docker deployment platform with web UI, API, multi-node cluster management, and Forgejo CI/CD runners.
 
-**Zero-config deploy:** в workflow достаточно указать `runs-on` — остальное
-`deploy-stack` делает сам: определяет язык, собирает контейнер, поднимает сайт.
+**Zero-config deploy:** in a workflow it is enough to specify `runs-on` — the
+rest `deploy-stack` does itself: it detects the language, builds the container,
+and brings the site up.
 
 ```yaml
 name: Deploy
@@ -16,12 +17,12 @@ jobs:
       - run: deploy
 ```
 
-Порт, имя и тип задаются (по желанию) файлом `.deploy` в корне репозитория —
-см. [`.deploy` file](#deploy-file-optional).
+Port, name and type are set (optionally) from a `.deploy` file in the repo
+root — see [`.deploy` file](#deploy-file-optional).
 
 ## Features
 
-### Web UI (v0.0.2)
+### Web UI (v1.5.3)
 
 | Tab | What you get |
 |-----|--------------|
@@ -31,20 +32,19 @@ jobs:
 | **Runners** | Forgejo/Gitea/GitHub runners: labels, **term**, edit, restart/stop/rm |
 | **Settings** | Accent color, themes (dark/light/black), show/hide all containers |
 
-**Terminal (everywhere):** кнопка `term` открывает модалку с логами + строкой ввода команд.
-Работает и на main-ноде, и на любой ноде кластера (exec стримится в реальном времени).
-Есть `↻ logs` и `clear`.
+**Terminal (everywhere):** the `term` button opens a modal with logs plus a
+command input line. It works on the main node and on any cluster node (exec is
+streamed in real time). There are `↻ logs` and `clear`.
 
-**Deploy to node:** в форме деплоя можно выбрать целевую ноду кластера.
+**Deploy to node:** the deploy form lets you pick a target cluster node.
 
-**Toasts** вместо alert; счётчики Sites/Nodes в top-bar.
+**Toasts** instead of alerts; Sites/Containers/Runners/Nodes counters in the top bar.
 
 ### Engine
 
-- **Zero-config deploy** — `deploy` в CI: имя из репозитория, язык авто, порт из `PORT`/`.deploy`
-- **Auto-detection** — PHP, Python, Node.js, Go, Rust, Ruby, Java, .NET, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, Bun, Deno
-- **CLI** — `deploy` (auto) / `add` / `rm` / `list` / `logs` / `restart` / `serve` / `add-runner`
-- **Webhook** — auto-deploy on push via Forgejo/Gitea webhooks
+- **Zero-config deploy** — `deploy` in CI: name from the repository, language auto-detected, port from `PORT`/`.deploy`
+- **Auto-detection** — PHP, Python (Django/Flask/FastAPI), Node.js/TypeScript, Bun, Deno, Go, Rust, Java/Kotlin, Ruby, Elixir, Haskell, Lua, Zig, Nim, Swift, C/C++, static sites
+- **CLI** — `deploy` (auto) / `add` / `rm` / `list` / `logs` / `restart` / `runners` / `add-runner` / `rm-runner` / `status` / `up` / `down` / `serve`
 - **Cluster API** — aggregate status, remote exec/logs (streaming), remote deploy, node CRUD
 
 ## Architecture
@@ -83,10 +83,13 @@ docker run --rm -v "$PWD":/src -w /src -e CGO_ENABLED=0 -e GOOS=linux -e GOARCH=
 
 ```bash
 scp deploy root@SERVER:/root/deploy-stack/deploy
-scp -r static/ root@SERVER:/root/deploy-stack/static/
+scp -r static/ templates/ root@SERVER:/root/deploy-stack/
 mkdir -p /root/deploy-stack/data
 /root/deploy-stack/deploy serve --port 9090
 ```
+
+`static/` serves the web UI; `templates/` is required to build site images
+(it is looked up next to the binary).
 
 ### 3. Or docker-compose
 
@@ -115,17 +118,14 @@ password for you.
 ```bash
 deploy                                  # auto-deploy current repo (CI)
 deploy --port 8084 [--name N --type T]  # auto-deploy with flags
-deploy --tools git,curl --env K=V --volumes /h:/c:ro
-                                        # container settings (see below)
-deploy version                          # print version
-deploy add <name> <dir> [--port N]      # add site (auto language)
+deploy add <name> <dir> [--port N] [--type T]  # add site (auto language)
 deploy rm <name>                        # remove site
 deploy list                             # sites: port + status
 deploy logs <name> [--tail N]           # site logs
 deploy restart <name>                   # restart site
 deploy runners                          # list runners
-deploy add-runner <name> <token>        # add Forgejo runner
-deploy rm-runner [name]                 # remove runner(s)
+deploy add-runner <name> <token> [--url URL]   # add Forgejo runner
+deploy rm-runner [name]                 # remove runner(s); all if no name
 deploy status                           # site containers
 deploy up / down                        # start/stop all
 deploy serve --port 3000                # panel (web UI + API)
@@ -137,34 +137,34 @@ Priority: **flag > env > `.deploy` file > auto-detect**.
 
 | Flag | Env | Meaning |
 |------|-----|---------|
-| `--port N` | `PORT` / `DEPLOY_PORT` | host port (else `.deploy` PORT, else free port) |
-| `--name N` | `DEPLOY_SITE` | site name (else `NAME` / repo name / dir) |
-| `--type T` | `DEPLOY_TYPE` | `static\|php\|python\|node\|go\|...` (else `TYPE` / detect) |
+| `--port N` | `PORT` / `DEPLOY_PORT` | host port (else `.deploy` PORT, else a free port) |
+| `--name N` | `DEPLOY_SITE` | site name (else `NAME` / repo name / dir name) |
+| `--type T` | `DEPLOY_TYPE` | `static\|php\|python\|node\|go` (else `TYPE` / auto-detect) |
 | `--dir D` | `DEPLOY_DIR` | source dir (else `GITHUB_WORKSPACE`) |
-| `--tools a,b` | `DEPLOY_TOOLS` | packages installed into the image (apk/apt) |
-| `--env K=V` | `DEPLOY_ENV` | container env, repeatable (`A=1,B=2`) |
-| `--volumes h:c[:ro]` | `DEPLOY_VOLUMES` | extra container mounts, comma-separated |
-| `--bind A` | `DEPLOY_BIND` | address the container publishes on (default `0.0.0.0`) |
-| `--host IP` | `DEPLOY_HOST` | IP printed in the “deployed” URL |
+| — | `DEPLOY_BIND` | address the container publishes on (default `0.0.0.0`) |
+| — | `DEPLOY_HOST` | IP shown in the "deployed" URL (default `0.0.0.0`) |
 
-Tools/env/volumes are applied **for this deploy only** (on top of the panel's
-per-site customization) — nothing is written to `site-custom.json`.
+Only `--dir`, `--name`, `--type` and `--port` are recognized as flags;
+`DEPLOY_BIND` and `DEPLOY_HOST` are environment-only (there is no `--bind` /
+`--host` flag).
+
+Tools, container env and extra volumes are configured **per site in the
+panel** — the `cfg` button in the Sites tab, or
+`GET`/`POST /api/v1/sites/:name/custom` (stored in `site-custom.json`).
+There are no `--tools` / `--env` / `--volumes` flags and no
+`DEPLOY_TOOLS` / `DEPLOY_ENV` / `DEPLOY_VOLUMES` variables.
 
 ### `.deploy` file (optional)
 
-Put in repo root — then workflow only needs `runs-on`:
+Put it in the repo root — then the workflow only needs `runs-on`:
 
 ```
 NAME=my-site
 PORT=8084
 TYPE=static                # static | php | python | node | go
-
-# container settings (same as --tools/--volumes/--env)
-TOOLS=git,curl
-VOLUMES=/srv/keys:/etc/app/keys:ro
-ENV_APP_ENV=production
-ENV_DEBUG=0
 ```
+
+Only `NAME`, `TYPE` and `PORT` are read from this file.
 
 ### Per-site extra volumes (secrets/keys)
 
@@ -183,18 +183,24 @@ panel=/etc/ssh/reverse.key:/etc/deploy-secrets/reverse.key:ro
 PHP container copies `/etc/deploy-secrets/*` → `/etc/ssh/` as `www-data:www-data 0600`
 at start, so `ssh`/`rsync` from PHP work. File is gitignored.
 
+Volumes saved through the panel's per-site customization are appended on top
+of this list.
+
 ## API
 
-All endpoints require `Authorization: Bearer <token>`.
+Authenticated endpoints accept the token either as
+`Authorization: Bearer <token>` or via the `dt` cookie set at login.
+`/api/v1/login` and `/health` need no auth.
 
 ### Auth & status
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/login` | Get token |
+| POST | `/api/v1/login` | Get token (also sets the `dt` cookie) |
 | POST | `/api/v1/logout` | Invalidate token |
 | GET | `/api/v1/status` | Server status (containers/sites/runners/version) |
 | GET | `/health` | Liveness (no auth) |
+| GET | `/api/v1/docs` | Built-in API docs (HTML) |
 
 ### Sites & containers
 
@@ -202,6 +208,7 @@ All endpoints require `Authorization: Bearer <token>`.
 |--------|----------|-------------|
 | GET | `/api/v1/sites` | Managed sites (name/port/status/image) |
 | POST | `/api/v1/sites` | Deploy site |
+| POST | `/api/v1/deploy` | One-shot auto deploy; body `{"name":"...","dir":"...","port":N,"type":"..."}` (`name` or `dir` required) |
 | GET | `/api/v1/sites/:name/custom` | Site customization (tools/env/volumes) |
 | POST | `/api/v1/sites/:name/custom` | Save customization; body `{"tools":[],"env":{},"volumes":[],"apply":true}` redeploys |
 | GET | `/api/v1/containers` | List containers (`?show_all=true`) |
@@ -265,7 +272,8 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ## Runner Labels
 
-Format: `label:host` — determines which workflow runs on which node.
+Labels are free-form, comma-separated strings on a runner. A workflow runs on
+a runner whose labels include its `runs-on` value.
 
 | Label | Node |
 |-------|------|
@@ -288,7 +296,9 @@ jobs:
 
 Port, name and type live in the `.deploy` file (see above) — no `env:` block
 needed. For PHP sites needing their own webserver set `TYPE=php` there
-(nginx + php-fpm in one container), or drop a `Dockerfile` — auto-detected.
+(nginx + php-fpm in one container). For other languages a repo-level
+`Dockerfile` is used as-is when no extra tools are configured in the panel
+(PHP always uses the built-in template; static sites always use `nginx:alpine`).
 
 ## Forgejo Runner Setup
 
@@ -296,6 +306,8 @@ needed. For PHP sites needing their own webserver set `TYPE=php` there
 cd /root/deploy-stack
 ./deploy add-runner my-runner <REGISTRATION_TOKEN> --url http://forgejo:3000
 ```
+
+`--url` is the Forgejo/Gitea server URL (default `http://10.0.0.1:3000`).
 
 Runner comes up in a container with docker-cli/rsync/node, links `deploy`,
 and uses the given labels. Runner is also in `docker-compose.yml` (profile `ci`)
@@ -342,15 +354,17 @@ CGO_ENABLED=0 go build -ldflags="-s -w" -o deploy . && systemctl restart deploy-
 | Go | golang:1.22-alpine | 8080 |
 | Rust | rust:1.77-alpine | 8080 |
 | Java/Kotlin | eclipse-temurin:21 | 8080 |
-| .NET/C# | mcr.microsoft.com/dotnet | 8080 |
 | Ruby 3.3 | ruby:3.3-alpine | 3000 |
 | Elixir 1.16 | elixir:1.16-alpine | 4000 |
 | Haskell 9.6 | haskell:9.6-alpine | 8080 |
 | Lua 5.4 | lua:5.4-alpine | 8080 |
-| Zig 0.11 | zig:0.11-alpine | 8080 |
+| Zig 0.11 | ziglang/zig:0.11-alpine | 8080 |
 | Nim | nimlang/nim:alpine | 8080 |
 | Swift 5.10 | swift:5.10-alpine | 8080 |
 | C/C++ | gcc:alpine | 8080 |
+
+A `.NET` template also ships in `templates/dotnet/`, but `.NET` is not wired
+into auto-detection or `--type` yet.
 
 ## License
 

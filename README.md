@@ -162,9 +162,25 @@ Put it in the repo root — then the workflow only needs `runs-on`:
 NAME=my-site
 PORT=8084
 TYPE=static                # static | php | python | node | go
+
+# extra sync exclusions (space-separated tokens)
+SYNC_EXCLUDE=src/ Cargo.toml Cargo.lock Dockerfile *.md .forgejo/
 ```
 
-Only `NAME`, `TYPE` and `PORT` are read from this file.
+`NAME`, `TYPE`, `PORT` and `SYNC_EXCLUDE` are read from this file.
+
+#### `SYNC_EXCLUDE`
+
+When CI deploys, the repo is synced to `/var/www/<NAME>` with
+`rsync -a --delete` (or the built-in `copyTree` when `rsync` is missing).
+`SYNC_EXCLUDE` adds project-specific exclusions on top of the built-in list:
+
+- each whitespace-separated token becomes its own `--exclude=<token>`
+  (passed verbatim — no glob expansion, no normalization);
+- no `SYNC_EXCLUDE` key → behavior is exactly as before;
+- the same tokens are honored by the `copyTree` fallback;
+- `--delete-excluded` is **not** used — files already in the destination that
+  match the pattern are left alone.
 
 ### Per-site extra volumes (secrets/keys)
 

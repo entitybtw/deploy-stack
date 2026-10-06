@@ -975,6 +975,32 @@ func buildServiceBlock(name, dir string, port int, lang LangInfo) string {
       - "deploy-stack.site=%s"
 `, safe, dir, safe, bind, port, envBlock(safe, nil), volBlock, name)
 
+	case "rust":
+		// Бинарь собирается в образе; файлы сайта (БД, шаблоны, upload, data) — bind-mount.
+		inner := innerPort(lang)
+		df := ".deploy.Dockerfile"
+		if ownDockerfile && len(custom.Tools) == 0 {
+			df = "Dockerfile"
+		}
+		volBlock := siteVolumesBlock([]string{dir + ":/var/www/" + name}, extraVols)
+		env := envBlock(safe, map[string]string{
+			"PORT":          strconv.Itoa(inner),
+			"UST_ROOT":      "/var/www/" + name,
+			"UST_DB":        "/var/www/" + name + "/database.sqlite",
+			"UST_UPLOAD":    "/var/www/" + name + "/upload",
+			"UST_TEMPLATES": "/var/www/" + name + "/templates",
+		})
+		return fmt.Sprintf(`  %s:
+    build:
+      context: %s
+      dockerfile: %s
+    container_name: %s
+    restart: unless-stopped
+    ports: ["%s:%d:%d"]
+%s%s    labels:
+      - "deploy-stack.site=%s"
+`, safe, dir, df, safe, bind, port, inner, env, volBlock, name)
+
 	default:
 		inner := innerPort(lang)
 		df := ".deploy.Dockerfile"
@@ -1021,12 +1047,18 @@ func syncDir(src, dst string) error {
 	if _, err := exec.LookPath("rsync"); err == nil {
 		cmd := exec.Command("rsync", "-a", "--delete",
 			"--exclude=.git", "--exclude=*.db", "--exclude=*.sqlite", "--exclude=*.sqlite3",
-			"--exclude=*.db-wal", "--exclude=*.db-shm", "--exclude=.deploy.Dockerfile",
+			"--exclude=*.db-wal", "--exclude=*.db-shm",
+			"--exclude=*.sqlite-wal", "--exclude=*.sqlite-shm",
+			"--exclude=.deploy.Dockerfile",
+			"--exclude=target/",
 			"--exclude=.env", "--exclude=*.env", "--exclude=.env.*",
-			"--exclude=data/", "--exclude=uploads/", "--exclude=.ssh/",
-			"--exclude=cache/", "--exclude=access_requests.json",
-			"--exclude=site_data.js", "--exclude=site_config.json",
-			"--exclude=privacy.html", "--exclude=terms.html",
+			"--exclude=data/", "--exclude=uploads/", "--exclude=upload/", "--exclude=.ssh/",
+			"--exclude=cache/",
+			// Ведущий / = только корень репозитория. Без него паттерн матчит basename
+			// на любой глубине и съедал вложенные шаблоны (templates/solar/privacy.html).
+			"--exclude=/privacy.html", "--exclude=/terms.html",
+			"--exclude=/site_data.js", "--exclude=/site_config.json",
+			"--exclude=/access_requests.json",
 			"--exclude=goserver/",
 			src+"/", dst+"/")
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -1045,14 +1077,16 @@ func copyTree(src, dst string) error {
 			base == "cache", base == "access_requests.json",
 			base == "site_data.js", base == "site_config.json",
 			base == "privacy.html", base == "terms.html",
-			base == "goserver":
+			base == "goserver", base == "target":
 			return true
 		case strings.HasSuffix(base, ".db") || strings.HasSuffix(base, ".sqlite") ||
 			strings.HasSuffix(base, ".sqlite3") || strings.HasSuffix(base, ".db-wal") ||
-			strings.HasSuffix(base, ".db-shm") || strings.HasSuffix(base, ".env"):
+			strings.HasSuffix(base, ".db-shm") || strings.HasSuffix(base, ".sqlite-wal") ||
+			strings.HasSuffix(base, ".sqlite-shm") || strings.HasSuffix(base, ".env"):
 			return true
 		case rel == "data" || strings.HasPrefix(rel, "data/") ||
 			rel == "uploads" || strings.HasPrefix(rel, "uploads/") ||
+			rel == "upload" || strings.HasPrefix(rel, "upload/") ||
 			rel == ".ssh" || strings.HasPrefix(rel, ".ssh/"):
 			return true
 		}

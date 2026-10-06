@@ -1041,35 +1041,92 @@ func dockerComposeFile(path string, args ...string) int {
 	return 0
 }
 
-// syncDir копирует исходники в /var/www/<name> (rsync, иначе cp -a).
+// syncExcludeTokens возвращает токены SYNC_EXCLUDE из .deploy-конфига
+// (разделены пробелами). Каждый токен уходит в rsync как отдельный
+// --exclude=<токен> без трансформаций. Ключа нет или он пуст → nil
+// (поведение как раньше).
+func syncExcludeTokens(cfg map[string]string) []string {
+	v := strings.TrimSpace(cfg["SYNC_EXCLUDE"])
+	if v == "" {
+		return nil
+	}
+	return strings.Fields(v)
+}
+
+// rsyncArgs — аргументы rsync для syncDir: базовый список исключений,
+// поверх него доп. токены из SYNC_EXCLUDE. --delete-excluded намеренно
+// не добавляем: уже скопированные в dst файлы из списка не трогаем.
+func rsyncArgs(src, dst string, extra []string) []string {
+	args := []string{"-a", "--delete",
+		"--exclude=.git", "--exclude=*.db", "--exclude=*.sqlite", "--exclude=*.sqlite3",
+		"--exclude=*.db-wal", "--exclude=*.db-shm",
+		"--exclude=*.sqlite-wal", "--exclude=*.sqlite-shm",
+		"--exclude=.deploy.Dockerfile",
+		"--exclude=target/",
+		"--exclude=.env", "--exclude=*.env", "--exclude=.env.*",
+		"--exclude=data/", "--exclude=uploads/", "--exclude=upload/", "--exclude=.ssh/",
+		"--exclude=cache/",
+		// Ведущий / = только корень репозитория. Без него паттерн матчит basename
+		// на любой глубине и съедал вложенные шаблоны (templates/solar/privacy.html).
+		"--exclude=/privacy.html", "--exclude=/terms.html",
+		"--exclude=/site_data.js", "--exclude=/site_config.json",
+		"--exclude=/access_requests.json",
+		"--exclude=goserver/",
+	}
+	for _, t := range extra {
+		args = append(args, "--exclude="+t)
+	}
+	return append(args, src+"/", dst+"/")
+}
+
+// syncDir копирует исходники в /var/www/<name> (rsync, иначе copyTree).
+// Свои исключения проект задаёт в .deploy: SYNC_EXCLUDE=src/ Cargo.toml ...
 func syncDir(src, dst string) error {
 	os.MkdirAll(dst, 0755)
+	extra := syncExcludeTokens(loadDeployConfig(src))
 	if _, err := exec.LookPath("rsync"); err == nil {
-		cmd := exec.Command("rsync", "-a", "--delete",
-			"--exclude=.git", "--exclude=*.db", "--exclude=*.sqlite", "--exclude=*.sqlite3",
-			"--exclude=*.db-wal", "--exclude=*.db-shm",
-			"--exclude=*.sqlite-wal", "--exclude=*.sqlite-shm",
-			"--exclude=.deploy.Dockerfile",
-			"--exclude=target/",
-			"--exclude=.env", "--exclude=*.env", "--exclude=.env.*",
-			"--exclude=data/", "--exclude=uploads/", "--exclude=upload/", "--exclude=.ssh/",
-			"--exclude=cache/",
-			// Ведущий / = только корень репозитория. Без него паттерн матчит basename
-			// на любой глубине и съедал вложенные шаблоны (templates/solar/privacy.html).
-			"--exclude=/privacy.html", "--exclude=/terms.html",
-			"--exclude=/site_data.js", "--exclude=/site_config.json",
-			"--exclude=/access_requests.json",
-			"--exclude=goserver/",
-			src+"/", dst+"/")
+		cmd := exec.Command("rsync", rsyncArgs(src, dst, extra)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("rsync: %v: %s", err, strings.TrimSpace(string(out)))
 		}
 		return nil
 	}
-	return copyTree(src, dst)
+	return copyTree(src, dst, extra)
 }
 
-func copyTree(src, dst string) error {
+// matchSyncExclude — эмуляция rsync --exclude для copyTree (fallback без rsync):
+// токен с завершающим "/" матчит только директории; токен без внутреннего "/"
+// (глоб вида *.md тоже) матчит basename на любой глубине; токен со внутренним
+// "/" — от корня репозитория. Совпадение директории → её поддерево не входит
+// (Walk возвращает SkipDir).
+func matchSyncExclude(rel string, isDir bool, tokens []string) bool {
+	if len(tokens) == 0 {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	for _, tok := range tokens {
+		dirOnly := strings.HasSuffix(tok, "/")
+		pat := strings.TrimSuffix(tok, "/")
+		if pat == "" || (dirOnly && !isDir) {
+			continue
+		}
+		if strings.Contains(pat, "/") {
+			// anchored: матчим относительно корня репозитория
+			if ok, _ := filepath.Match(strings.TrimPrefix(pat, "/"), rel); ok {
+				return true
+			}
+			continue
+		}
+		if ok, _ := filepath.Match(pat, filepath.Base(rel)); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// copyTree — fallback syncDir, когда rsync не установлен. extra — токены
+// SYNC_EXCLUDE, те же правила, что --exclude у rsync.
+func copyTree(src, dst string, extra []string) error {
 	persistent := func(rel string) bool {
 		base := filepath.Base(rel)
 		switch {
@@ -1100,7 +1157,7 @@ func copyTree(src, dst string) error {
 		if rel == "." {
 			return nil
 		}
-		if persistent(rel) {
+		if persistent(rel) || matchSyncExclude(rel, fi.IsDir(), extra) {
 			if fi.IsDir() {
 				return filepath.SkipDir
 			}

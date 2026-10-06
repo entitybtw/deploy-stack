@@ -1,5 +1,6 @@
 dist/
 deploy
+deploy-stack
 deploy.exe
 *.exe
 .env

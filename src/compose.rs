@@ -388,6 +388,114 @@ pub fn container_host_port(name: &str) -> u16 {
     0
 }
 
+/// serviceCandidates — имя + языковые суффиксы (как в remove_service).
+fn service_candidates(name: &str) -> BTreeSet<String> {
+    let mut candidates: BTreeSet<String> = BTreeSet::new();
+    candidates.insert(name.to_string());
+    for suffix in [
+        "-php", "-node", "-go", "-python", "-rust", "-jvm", "-dotnet", "-ruby", "-bun", "-deno",
+        "-docker",
+    ] {
+        candidates.insert(format!("{}{}", name, suffix));
+    }
+    candidates
+}
+
+/// service_port_in — привязанный порт сервиса из текста compose: (external, internal).
+/// Имя матчится как в remove_service (имя + языковые суффиксы). None — если нет.
+fn service_port_in(content: &str, name: &str) -> Option<(u16, Option<u16>)> {
+    let candidates = service_candidates(name);
+    let mut in_services = false;
+    let mut in_target = false;
+    for line in content.split('\n') {
+        let ind = line.len() - line.trim_start_matches(|c| c == ' ' || c == '\t').len();
+        let trimmed = line.trim();
+        if ind == 0 {
+            in_services = trimmed.starts_with("services");
+            in_target = false;
+            continue;
+        }
+        if !in_services {
+            continue;
+        }
+        if ind <= 2 {
+            let key = trimmed.strip_suffix(':').unwrap_or(trimmed);
+            in_target = candidates.contains(key);
+        }
+        if in_target && trimmed.starts_with("ports:") {
+            if let Some(spec) = parse_ports_line(trimmed) {
+                return Some(spec);
+            }
+        }
+    }
+    None
+}
+
+/// rewrite_ports_line — переписать ports-строку compose, сохраняя bind-IP и отступ.
+fn rewrite_ports_line(line: &str, external: u16, internal: u16) -> String {
+    let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+    let bind = line
+        .find('"')
+        .and_then(|s| line[s + 1..].find('"').map(|e| &line[s + 1..s + 1 + e]))
+        .and_then(|spec| spec.split(':').next())
+        .filter(|p| p.contains('.'))
+        .unwrap_or("0.0.0.0");
+    format!("{}ports: [\"{}:{}:{}\"]", indent, bind, external, internal)
+}
+
+/// set_service_port_in — перезаписать ports-строку сервиса в тексте compose.
+/// Если сервиса/ports нет — текст без изменений.
+fn set_service_port_in(content: &str, name: &str, external: u16, internal: u16) -> String {
+    let candidates = service_candidates(name);
+    let mut out: Vec<String> = Vec::new();
+    let mut in_services = false;
+    let mut in_target = false;
+    for line in content.split('\n') {
+        let ind = line.len() - line.trim_start_matches(|c| c == ' ' || c == '\t').len();
+        let trimmed = line.trim();
+        let mut cur = line.to_string();
+        if ind == 0 {
+            in_services = trimmed.starts_with("services");
+            in_target = false;
+        } else if in_services && ind <= 2 {
+            let key = trimmed.strip_suffix(':').unwrap_or(trimmed);
+            in_target = candidates.contains(key);
+        } else if in_services && in_target && trimmed.starts_with("ports:") {
+            cur = rewrite_ports_line(line, external, internal);
+        }
+        out.push(cur);
+    }
+    out.join("\n")
+}
+
+/// sticky_port — «запоминаемый» порт: переиспользует уже привязанный порт сервиса
+/// (из compose, иначе из запущенного контейнера), чтобы ре-деплой не менял порт.
+/// Если сервиса нет — первый свободный (как freePort). Возвращает (external, internal).
+pub fn sticky_port(name: &str, lang_port: u16) -> (u16, Option<u16>) {
+    let safe = service_name(name);
+    if let Some((ext, int)) = service_port_in(&read_compose(), &safe) {
+        if ext != 0 {
+            return (ext, int);
+        }
+    }
+    let ext = container_host_port(&safe);
+    if ext != 0 {
+        return (ext, None);
+    }
+    (free_port(lang_port), None)
+}
+
+/// set_compose_service_port — перезаписать порт сервиса в compose (для /edit, чтобы
+/// правка порта переживала ре-деплой). Если сервиса нет — no-op.
+pub fn set_compose_service_port(name: &str, external: u16, internal: u16) {
+    let safe = service_name(name);
+    let content = read_compose();
+    let updated = set_service_port_in(&content, &safe, external, internal);
+    if updated != content {
+        write_compose(&updated);
+    }
+}
+
 /// runnerNames — реальные контейнеры раннеров (docker ps).
 pub fn runner_names() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
@@ -605,5 +713,29 @@ mod tests {
         );
         assert_eq!(parse_ports_line("ports: [\"8282:80\"]"), Some((8282, Some(80))));
         assert_eq!(parse_ports_line("image: nginx"), None);
+    }
+
+    #[test]
+    fn service_port_in_reads_bound_port() {
+        let c = "services:\n  site1:\n    image: nginx:alpine\n    ports: [\"0.0.0.0:8282:8080\"]\n  other:\n    image: x\n    ports: [\"0.0.0.0:3000:80\"]\nvolumes: {}\n";
+        assert_eq!(service_port_in(c, "site1"), Some((8282, Some(8080))));
+        assert_eq!(service_port_in(c, "other"), Some((3000, Some(80))));
+        assert_eq!(service_port_in(c, "missing"), None);
+        // суффикс-кандидат: node-app ищется по node-app
+        let c2 = "services:\n  node-app:\n    image: y\n    ports: [\"0.0.0.0:3001:3000\"]\nvolumes: {}\n";
+        assert_eq!(service_port_in(c2, "node-app"), Some((3001, Some(3000))));
+    }
+
+    #[test]
+    fn set_service_port_in_rewrites_ports_line() {
+        let c = "services:\n  site1:\n    image: nginx:alpine\n    container_name: site1\n    ports: [\"0.0.0.0:8080:80\"]\n    restart: unless-stopped\n  other:\n    image: x\n    ports: [\"0.0.0.0:3000:80\"]\nvolumes: {}\n";
+        let out = set_service_port_in(c, "site1", 8282, 8080);
+        assert!(out.contains("ports: [\"0.0.0.0:8282:8080\"]"));
+        // чужой сервис не тронут
+        assert!(out.contains("ports: [\"0.0.0.0:3000:80\"]"));
+        // отступ и bind-IP сохранены
+        assert!(out.contains("    ports: [\"0.0.0.0:8282:8080\"]"));
+        // отсутствующий сервис → без изменений
+        assert_eq!(set_service_port_in(c, "nope", 1, 2), c);
     }
 }

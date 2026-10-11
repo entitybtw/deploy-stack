@@ -2,7 +2,8 @@
 use crate::auth::Auth;
 use crate::cluster::{civil_from_unix, Cluster, ServerReply, StreamWriter};
 use crate::compose::{
-    container_host_port, free_port, list_services, runner_names, service_name, PortSpec,
+    container_host_port, list_services, runner_names, service_name, set_compose_service_port,
+    sticky_port, PortSpec,
 };
 use crate::config::{deploy_home, get_site_custom, runner_config_file, save_site_custom, SiteCustom};
 use crate::deploy::{deploy_site, get_container_status, remove_site};
@@ -610,7 +611,11 @@ fn h_containers_sub(
         let host_ip = v.get("hostIP").and_then(|x| x.as_str()).unwrap_or("");
         let typ = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
         match recreate_container(cname, port, host_path, host_ip, typ, inner) {
-            Ok(()) => json_resp(w, &json!({ "status": "updated", "name": cname })),
+            Ok((fp, fi)) => {
+                // фиксируем порт в compose, чтобы правка пережила ре-деплой
+                set_compose_service_port(cname, fp, fi);
+                json_resp(w, &json!({ "status": "updated", "name": cname }))
+            }
             Err(e) => json_err(w, 400, &e),
         }
         return;
@@ -654,7 +659,11 @@ fn h_sites(w: &mut RespWriter, method: &str, body: &[u8]) {
         }
         let (mut port, mut inner) = parse_port_field(v.get("port"));
         if port == 0 {
-            port = free_port(lang.port);
+            let (s_ext, s_int) = sticky_port(name, lang.port);
+            port = s_ext;
+            if inner.is_none() {
+                inner = s_int;
+            }
         }
         match deploy_site(name, &dir, port, &lang, inner) {
             Ok(actual) => {
@@ -971,7 +980,11 @@ fn h_deploy(w: &mut RespWriter, method: &str, body: &[u8]) {
     }
     let (mut port, mut inner) = parse_port_field(v.get("port"));
     if port == 0 {
-        port = free_port(lang.port);
+        let (s_ext, s_int) = sticky_port(&name, lang.port);
+        port = s_ext;
+        if inner.is_none() {
+            inner = s_int;
+        }
     }
     match deploy_site(&name, &dir, port, &lang, inner) {
         Ok(actual) => json_resp(
@@ -1082,7 +1095,7 @@ fn recreate_container(
     host_ip: &str,
     _typ: &str,
     inner_override: Option<u16>,
-) -> Result<(), String> {
+) -> Result<(u16, u16), String> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
     let rem = || -> u64 {
         deadline
@@ -1149,7 +1162,9 @@ fn recreate_container(
             }
         }
         if host_port == 0 {
-            host_port = 8080;
+            // контейнер не запущен/без портов: вспоминаем привязанный порт из compose,
+            // иначе дефолт 8080 (как раньше)
+            host_port = crate::compose::sticky_port(name, 8080).0;
         }
     }
     let host_ip = if host_ip.is_empty() { "0.0.0.0" } else { host_ip };
@@ -1193,7 +1208,8 @@ fn recreate_container(
             out_str.trim()
         ));
     }
-    Ok(())
+    let inner_u16: u16 = inner.parse().unwrap_or(80);
+    Ok((host_port, inner_u16))
 }
 
 // ─────────────────────────── static / routing ───────────────────────────

@@ -237,7 +237,7 @@ nav{padding:0;border-bottom:1px solid var(--br1);position:sticky;top:0;z-index:2
 <div class="mbg" id="mEditSite" onclick="if(event.target===this)hideModal('mEditSite')"><div class="md">
   <h2>Edit: <span id="esName2"></span></h2>
   <input type="hidden" id="esC">
-  <div class="fg"><label>Host Port</label><input id="esPort" type="number" placeholder="8090"></div>
+  <div class="fg"><label>Host Port — <span style="font-weight:400">8090</span> or <span style="font-weight:400">8282:8080</span> (host:container)</label><input id="esPort" type="text" inputmode="numeric" placeholder="8090  or  8282:8080"></div>
   <div class="fg"><label>Bind IP</label><input id="esIP" placeholder="0.0.0.0"></div>
   <div class="fg"><label>Source Directory</label><input id="esPath" placeholder="/var/www/name"></div>
   <div class="fa"><button class="b" onclick="hideModal('mEditSite')">Cancel</button><button class="b b-p" onclick="saveEditSite()">Save & Recreate</button></div>
@@ -488,8 +488,8 @@ function loadSites(){
 function doInspect(n,name){api('GET','/api/v1/containers/'+n+'/inspect').then(function(t){$('ib').textContent=fmtJSON(t);showModal('mInspect')}).catch(function(er){$('ib').textContent='Error: '+er;showModal('mInspect')})}
 function doAction(n,a){api('POST','/api/v1/containers/'+n+'/'+a).then(function(){toast(a+' ok','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
 function doRemove(n,name){if(!confirm('Remove '+name+'?'))return;api('DELETE','/api/v1/containers/'+n+'/remove').then(function(){toast(name+' removed','ok');setTimeout(function(){loadContainers();loadSites()},1000)}).catch(function(er){toast(String(er),'err')})}
-function openEdit(n,name,portsStr){$('esName2').textContent=name;$('esC').value=n;var pg='';var m=String(portsStr).match(/(\d+)->/);if(!m)m=String(portsStr).match(/->(\d+)/);if(m)pg=m[1];$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
-function saveEditSite(){var n=$('esC').value,port=parseInt($('esPort').value)||0,hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');toast('Saved','ok');setTimeout(function(){loadContainers();loadSites()},1500)}).catch(function(er){toast(String(er),'err')})}
+function openEdit(n,name,portsStr){$('esName2').textContent=name;$('esC').value=n;var pg='',s=String(portsStr),m=s.match(/(\d+)->(\d+)/);if(m)pg=m[1]+':'+m[2];else{m=s.match(/(\d+)->/);if(m)pg=m[1];else{m=s.match(/->(\d+)/);if(m)pg=m[1]}}$('esPort').value=pg;$('esIP').value='0.0.0.0';$('esPath').value='/var/www/'+name;showModal('mEditSite')}
+function saveEditSite(){var n=$('esC').value,port=$('esPort').value.trim()||'0',hostPath=$('esPath').value,hostIP=$('esIP').value||'0.0.0.0';api('POST','/api/v1/containers/'+n+'/edit',{port:port,hostPath:hostPath,hostIP:hostIP}).then(function(){hideModal('mEditSite');toast('Saved','ok');setTimeout(function(){loadContainers();loadSites()},1500)}).catch(function(er){toast(String(er),'err')})}
 
 /* ── Site customization (tools / env / volumes) ── */
 function openSiteCustom(n,name){

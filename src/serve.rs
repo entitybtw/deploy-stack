@@ -605,11 +605,11 @@ fn h_containers_sub(
     }
     if let Some(cname) = name.strip_suffix("/edit") {
         let v: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
-        let port = v.get("port").and_then(|x| x.as_u64()).unwrap_or(0) as u16;
+        let (port, inner) = parse_port_field(v.get("port"));
         let host_path = v.get("hostPath").and_then(|x| x.as_str()).unwrap_or("");
         let host_ip = v.get("hostIP").and_then(|x| x.as_str()).unwrap_or("");
         let typ = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
-        match recreate_container(cname, port, host_path, host_ip, typ) {
+        match recreate_container(cname, port, host_path, host_ip, typ, inner) {
             Ok(()) => json_resp(w, &json!({ "status": "updated", "name": cname })),
             Err(e) => json_err(w, 400, &e),
         }
@@ -1081,6 +1081,7 @@ fn recreate_container(
     host_path: &str,
     host_ip: &str,
     _typ: &str,
+    inner_override: Option<u16>,
 ) -> Result<(), String> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
     let rem = || -> u64 {
@@ -1098,18 +1099,22 @@ fn recreate_container(
     if image.is_empty() {
         return Err("контейнер не найден".to_string());
     }
-    // внутренний порт по ExposedPorts
-    let exposed = get("{{range $p, $_ := .Config.ExposedPorts}}{{$p}} {{end}}");
+    // внутренний порт: явный override (например 8282:8080) либо авто по ExposedPorts
     let mut inner = "80".to_string();
-    for e in exposed.split_whitespace() {
-        if e.starts_with("80") {
-            inner = "80".to_string();
-            break;
-        }
-        let p = e.split('/').next().unwrap_or("");
-        if !p.is_empty() {
-            inner = p.to_string();
-            break;
+    if let Some(io) = inner_override {
+        inner = io.to_string();
+    } else {
+        let exposed = get("{{range $p, $_ := .Config.ExposedPorts}}{{$p}} {{end}}");
+        for e in exposed.split_whitespace() {
+            if e.starts_with("80") {
+                inner = "80".to_string();
+                break;
+            }
+            let p = e.split('/').next().unwrap_or("");
+            if !p.is_empty() {
+                inner = p.to_string();
+                break;
+            }
         }
     }
     // bind-маунты

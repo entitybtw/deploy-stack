@@ -10,7 +10,7 @@ mod serve;
 mod sync;
 mod util;
 
-use crate::compose::{container_host_port, free_port, list_services, runner_names, service_name, PortSpec};
+use crate::compose::{container_host_port, list_services, runner_names, service_name, sticky_port, PortSpec};
 use crate::config::{default_port, host_ip, parse_flags, templates};
 use crate::deploy::{
     add_runner, auto_deploy, deploy_site, docker_compose, get_container_status, interactive,
@@ -48,7 +48,7 @@ fn main() {
                     lang = LangInfo::new(t, t, default_port(t), Vec::new());
                 }
             }
-            // --port N[:M] — внешний[:внутренний]; пусто/0 → авто.
+            // --port N[:M] — внешний[:внутренний]; пусто/0 → «липкий» порт сервиса.
             let mut port: u16 = 0;
             let mut inner: Option<u16> = None;
             if let Some(p) = opts.get("port") {
@@ -57,7 +57,11 @@ fn main() {
                 inner = spec.internal;
             }
             if port == 0 {
-                port = free_port(lang.port);
+                let (s_ext, s_int) = sticky_port(name, lang.port);
+                port = s_ext;
+                if inner.is_none() {
+                    inner = s_int;
+                }
             }
             match deploy_site(name, dir, port, &lang, inner) {
                 Ok(actual) => println!("✓ {} deployed: http://{}:{}", name, host_ip(), actual),

@@ -397,6 +397,12 @@ The intentional and accepted differences are:
 - **JSON decode strictness** — a few endpoints differ on malformed JSON
   (trailing garbage / partial decode) due to `serde` vs Go's streaming
   decoder; valid JSON is identical.
+- **Sticky ports** — Go called `freePort` on every deploy without an explicit
+  `PORT`, so a re-deploy could silently move the site to a new port. The Rust
+  build reuses the already-bound port (compose entry first, running container
+  second) unless an explicit port is given, and `/containers/:name/edit`
+  persists the new binding back into `sites/docker-compose.yml` so the edit
+  survives the next re-deploy.
 
 ## Supported Languages (auto-detected)
 

@@ -233,7 +233,9 @@ pub fn auto_deploy(args: &[String]) {
     }
     let lang = lang.unwrap_or_else(|| detect_lang(&dir));
 
-    // порт: приоритет flag > env DEPLOY_PORT/PORT > .deploy PORT; поддержка 8282:8080
+    // порт: приоритет flag > env DEPLOY_PORT/PORT > .deploy PORT; поддержка 8282:8080.
+    // Если порт не задан явно — «липкий»: переиспользуем уже привязанный порт сервиса,
+    // чтобы ре-деплой не менял его (иначе freePort дёргал порт каждый раз).
     let mut port_str = env_or(&["DEPLOY_PORT", "PORT"]);
     if let Some(v) = opts.get("port") {
         port_str = v.clone();
@@ -242,12 +244,11 @@ pub fn auto_deploy(args: &[String]) {
         port_str = cfg.get("PORT").cloned().unwrap_or_default();
     }
     let spec = PortSpec::parse(&port_str);
-    let port = if spec.external == 0 {
-        free_port(lang.port)
+    let (port, inner) = if spec.external == 0 {
+        sticky_port(&name, lang.port)
     } else {
-        spec.external
+        (spec.external, spec.internal)
     };
-    let inner = spec.internal;
 
     let target = format!("/var/www/{}", name);
     if crate::config::clean_path(&dir) != crate::config::clean_path(&target) {
@@ -326,11 +327,15 @@ pub fn interactive() {
         );
     }
 
-    let auto_p = free_port(lang.port);
-    let port_str = prompt(&format!("  Port [{} auto, можно 8282:8080]: ", auto_p));
+    // «липкий»: при повторном добавлении существующего сервиса предлагаем его порт
+    let suggested = sticky_port(&name, lang.port);
+    let port_str = prompt(&format!("  Port [{} auto, можно 8282:8080]: ", suggested.0));
     let spec = PortSpec::parse(&port_str);
-    let port = if spec.external == 0 { auto_p } else { spec.external };
-    let inner = spec.internal;
+    let (port, inner) = if spec.external == 0 {
+        suggested
+    } else {
+        (spec.external, spec.internal)
+    };
 
     println!("\n  ┌──────────────────────────────┐");
     println!("  │ Name:  {:<22} │", name);

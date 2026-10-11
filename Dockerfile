@@ -1,14 +1,17 @@
-# Build stage — компилируем статический Go-бинарь менеджера.
-# ВНИМАНИЕ: если у хоста сломан IPv6, docker build может висеть на apk fetch.
+# Build stage — компилируем статический Rust-бинарь менеджера.
+# ВНИМАНИЕ: если у хоста сломан IPv6, docker build может висеть на fetch.
 # Собирай так:  docker build --network=host -t deploy-stack:latest .
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
+# Ограничение параллелизма: сервер общий, максимум 2 нити (cargo -j2).
+FROM --platform=$BUILDPLATFORM rust:1.80-alpine AS build
 WORKDIR /src
-COPY go.mod ./
-RUN go mod download
-COPY *.go ./
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /deploy-stack .
+RUN apk add --no-cache musl-dev
+ENV CARGO_BUILD_JOBS=2
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src && echo 'fn main() {}' > src/main.rs \
+    && cargo build --release --locked || true
+COPY src ./src
+COPY static ./static
+RUN touch src/main.rs && cargo build --release --locked -j2
 
 # Runtime — контейнер-менеджер
 FROM alpine:3.20
@@ -20,7 +23,7 @@ ENV DEPLOY_HOME=/deploy \
     DEPLOY_RUNNERS=/deploy/runners/docker-compose.yml \
     RUNNER_DATA=/runner
 
-COPY --from=build /deploy-stack /usr/local/bin/deploy-stack
+COPY --from=build /src/target/release/deploy-stack /usr/local/bin/deploy-stack
 
 # Статик и шаблоны — читаются из DEPLOY_HOME если смонтированы, либо из фоллбеков
 COPY static/  /usr/local/share/deploy-stack/static/

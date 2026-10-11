@@ -11,4 +11,5 @@ runners/
 deploy
 deploy.exe
 dist/
+target/
 .env

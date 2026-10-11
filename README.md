@@ -2,6 +2,11 @@
 
 Universal Docker deployment platform with web UI, API, multi-node cluster management, and Forgejo CI/CD runners.
 
+> **v2.0.0 — Rust rewrite.** The core is now a single static Rust binary that is
+> byte-compatible with the original Go v1.5.3 HTTP responses (same headers,
+> status codes, content-types and JSON shapes), and adds the `PORT=8282:8080`
+> external:internal port syntax. See [Known deviations](#known-deviations-rust-rewrite).
+
 **Zero-config deploy:** in a workflow it is enough to specify `runs-on` — the
 rest `deploy-stack` does itself: it detects the language, builds the container,
 and brings the site up.
@@ -22,7 +27,7 @@ root — see [`.deploy` file](#deploy-file-optional).
 
 ## Features
 
-### Web UI (v1.5.3)
+### Web UI (v2.0.0)
 
 | Tab | What you get |
 |-----|--------------|
@@ -66,17 +71,22 @@ the "main" UI and remotely manage the others.
 
 ### 1. Build
 
+deploy-stack is written in Rust (a byte-compatible rewrite of the original Go
+v1.5.3, now v2.0.0). Building needs a recent stable Rust toolchain.
+
 ```bash
 git clone https://git.example.com/example/deploy-stack.git
 cd deploy-stack
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o deploy .
+cargo build --release -j2        # binary: target/release/deploy-stack
 ```
 
-Or with Docker (no local Go needed):
+> **Note:** keep the parallelism low (`-j2`) on shared/constrained hosts — a
+> large `cargo build -jN` can saturate CPU and disk.
+
+Or with Docker (no local Rust needed):
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src -e CGO_ENABLED=0 -e GOOS=linux -e GOARCH=amd64 \
-  golang:1.23-alpine sh -c "go vet ./... && go build -ldflags='-s -w' -o /src/deploy ."
+docker build --network=host -t deploy-stack:latest .
 ```
 
 ### 2. Install on a server
@@ -118,7 +128,7 @@ password for you.
 ```bash
 deploy                                  # auto-deploy current repo (CI)
 deploy --port 8084 [--name N --type T]  # auto-deploy with flags
-deploy add <name> <dir> [--port N] [--type T]  # add site (auto language)
+deploy add <name> <dir> [--port N[:M]] [--type T]  # add site (auto language)
 deploy rm <name>                        # remove site
 deploy list                             # sites: port + status
 deploy logs <name> [--tail N]           # site logs
@@ -137,12 +147,18 @@ Priority: **flag > env > `.deploy` file > auto-detect**.
 
 | Flag | Env | Meaning |
 |------|-----|---------|
-| `--port N` | `PORT` / `DEPLOY_PORT` | host port (else `.deploy` PORT, else a free port) |
+| `--port N[:M]` | `PORT` / `DEPLOY_PORT` | host port (else `.deploy` PORT, else a free port). `N:M` sets host `N` + container `M` |
 | `--name N` | `DEPLOY_SITE` | site name (else `NAME` / repo name / dir name) |
 | `--type T` | `DEPLOY_TYPE` | `static\|php\|python\|node\|go` (else `TYPE` / auto-detect) |
 | `--dir D` | `DEPLOY_DIR` | source dir (else `GITHUB_WORKSPACE`) |
 | — | `DEPLOY_BIND` | address the container publishes on (default `0.0.0.0`) |
 | — | `DEPLOY_HOST` | IP shown in the "deployed" URL (default `0.0.0.0`) |
+
+**Port syntax `N:M`:** a port value may be a single number (`8282` — host port,
+container port = language default) or `external:internal` (`8282:8080` — host
+`8282`, container `8080`). This works everywhere a port is accepted: the
+`.deploy` file, the `PORT`/`DEPLOY_PORT` env vars, the `--port` flag, the
+interactive prompt, and the API `port` field (JSON number or string).
 
 Only `--dir`, `--name`, `--type` and `--port` are recognized as flags;
 `DEPLOY_BIND` and `DEPLOY_HOST` are environment-only (there is no `--bind` /
@@ -160,14 +176,17 @@ Put it in the repo root — then the workflow only needs `runs-on`:
 
 ```
 NAME=my-site
-PORT=8084
+PORT=8084                    # host port only (container = language default)
+# PORT=8282:8080             # or external:internal (host 8282, container 8080)
 TYPE=static                # static | php | python | node | go
 
 # extra sync exclusions (space-separated tokens)
 SYNC_EXCLUDE=src/ Cargo.toml Cargo.lock Dockerfile *.md .forgejo/
 ```
 
-`NAME`, `TYPE`, `PORT` and `SYNC_EXCLUDE` are read from this file.
+`NAME`, `TYPE`, `PORT` and `SYNC_EXCLUDE` are read from this file. `PORT`
+accepts both the plain form (`8084`) and the `external:internal` form
+(`8282:8080`).
 
 #### `SYNC_EXCLUDE`
 
@@ -348,7 +367,7 @@ cd /root/deploy-stack
 git pull
 docker compose up -d --build          # if compose
 # or host binary:
-CGO_ENABLED=0 go build -ldflags="-s -w" -o deploy . && systemctl restart deploy-stack
+cargo build --release -j2 && cp target/release/deploy-stack /root/deploy-stack/deploy && systemctl restart deploy-stack
 ```
 
 > **Note:** the panel runs the host-mounted binary
@@ -356,6 +375,28 @@ CGO_ENABLED=0 go build -ldflags="-s -w" -o deploy . && systemctl restart deploy-
 > When updating, replace that binary (and `static/index.html` if the UI
 > changed), then `docker restart deploy-stack`. Never touch site containers
 > or `.env`.
+
+## Known deviations (Rust rewrite)
+
+The Rust core targets **byte-level parity** with the Go v1.5.3 HTTP output.
+The intentional and accepted differences are:
+
+- **Version** — `2.0.0` (Go was `1.5.3`).
+- **Port syntax** — new `external:internal` (`8282:8080`) form for `PORT`,
+  `.deploy`, `--port`, the prompt and the API `port` field.
+- **Cluster `GET /servers/:id/containers/:cname/logs`** — Go's `ServeMux`
+  longest-prefix matching lets the `/servers/:id/containers/:cname` subtree
+  handler shadow the dedicated `.../logs` route, so that route was unreachable
+  in Go; the Rust router resolves it explicitly (logs are streamed).
+- **Path cleaning** — Go's `ServeMux` issues `301` redirects for unclean paths
+  (e.g. `//`, `/../`); the Rust router matches the raw path and does not
+  redirect.
+- **HTTP/1.0 + `Connection: keep-alive` + large body** — Go closes the
+  connection (close-delimited body); `tiny_http` may keep it open until the
+  client closes. Only affects this rare combination.
+- **JSON decode strictness** — a few endpoints differ on malformed JSON
+  (trailing garbage / partial decode) due to `serde` vs Go's streaming
+  decoder; valid JSON is identical.
 
 ## Supported Languages (auto-detected)
 

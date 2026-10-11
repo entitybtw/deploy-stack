@@ -4,6 +4,8 @@ deploy-stack
 deploy.exe
 *.exe
 .env
+# Rust build artifacts
+target/
 # локальные данные панели/сайтов
 deploy-data/
 www/

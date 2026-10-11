@@ -1,0 +1,18 @@
+[package]
+name = "deploy-stack"
+version = "2.0.0"
+edition = "2021"
+description = "Universal Docker deployment platform with web UI, API, cluster management and CI runners"
+
+[[bin]]
+name = "deploy-stack"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+
+[profile.release]
+strip = true
+opt-level = "s"
